@@ -2,6 +2,7 @@
 import { CornerDownLeft, Send, Square } from "@lucide/vue";
 import { computed } from "vue";
 import type { MnemeWorkspace } from "../../composables/useMnemeWorkspace";
+import { useI18n } from "../../composables/useI18n";
 import type { AnswerMode } from "../../types";
 import UiButton from "../ui/UiButton.vue";
 import UiSegmentedControl, { type UiSegmentedOption } from "../ui/UiSegmentedControl.vue";
@@ -13,6 +14,7 @@ const props = defineProps<{
   modeDescription: string;
 }>();
 
+const { t } = useI18n();
 const options = computed<UiSegmentedOption[]>(() => props.modes.map((mode) => ({ ...mode })));
 const selectedMode = computed({
   get: () => props.workspace.chatAnswerMode.value,
@@ -21,7 +23,7 @@ const selectedMode = computed({
 const running = computed(() => props.workspace.chatPending.value || props.workspace.chatControlPending.value);
 const retryable = computed(() => !running.value && props.workspace.chatError.value?.retryable);
 const composerPlaceholder = computed(() =>
-  running.value ? "Add a direction or queue the next question…" : "Ask Mneme…",
+  running.value ? t("ai.runningPlaceholder") : t("ai.placeholder"),
 );
 
 function updateMultiAgent(event: Event) {
