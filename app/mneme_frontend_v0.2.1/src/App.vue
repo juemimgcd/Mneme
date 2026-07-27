@@ -3,16 +3,13 @@ import type { Component } from "vue";
 import { computed } from "vue";
 import {
   BookOpen,
-  Bell,
   BrainCircuit,
   Brain,
   FlaskConical,
   GitBranch,
   LifeBuoy,
-  LogOut,
   Network,
   Plus,
-  RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
   UserRound,
@@ -20,8 +17,10 @@ import {
 } from "@lucide/vue";
 import ActivityBar from "./components/shell/ActivityBar.vue";
 import MobileNavigation from "./components/shell/MobileNavigation.vue";
+import MoreNavigationSheet from "./components/shell/MoreNavigationSheet.vue";
 import ResourceSidebar from "./components/shell/ResourceSidebar.vue";
 import StatusBar from "./components/shell/StatusBar.vue";
+import WorkspaceToolbar from "./components/shell/WorkspaceToolbar.vue";
 import UiIconButton from "./components/ui/UiIconButton.vue";
 import UiSkeleton from "./components/ui/UiSkeleton.vue";
 import UiStatusPanel from "./components/ui/UiStatusPanel.vue";
@@ -52,9 +51,19 @@ const VIEW_ITEMS = computed<ViewItem[]>(() => [
 ]);
 
 const currentViewItem = computed(() => VIEW_ITEMS.value.find((item) => item.id === workspace.view.value) ?? VIEW_ITEMS.value[0]);
+const primaryNavigationItems = computed(() => VIEW_ITEMS.value.slice(0, 4));
+const secondaryNavigationItems = computed(() => VIEW_ITEMS.value.slice(4));
+const moreNavigationActive = computed(() => secondaryNavigationItems.value.some((item) => item.id === workspace.view.value) || shell.moreOpen.value);
 const activeHealthLabel = computed(() => workspace.readiness.value?.overall_status ?? workspace.serviceHealth.value?.status ?? "preview");
 const activeViewLoadState = computed(() => workspace.viewLoadStates[workspace.view.value]);
 const activeViewLoading = computed(() => activeViewLoadState.value.phase.value === "loading");
+const toolbarContext = computed(() => workspace.selectedKnowledgeBase.value?.name ?? "");
+const resourceTitle = computed(() => {
+  if (workspace.view.value === "ai") return t("nav.ai");
+  if (workspace.view.value === "graph") return t("nav.graph");
+  if (workspace.view.value === "notes") return t("nav.vault");
+  return t("shell.researchSpaces");
+});
 
 function navigate(id: string) {
   workspace.view.value = id as WorkspaceView;
@@ -103,24 +112,54 @@ function openCreateCommand() {
       @change="workspace.uploadFile(($event.target as HTMLInputElement).files?.[0])"
     />
     <div class="mneme-shell" :class="{ 'mneme-shell--resource-closed': !shell.resourceOpen.value }">
-      <ActivityBar :items="VIEW_ITEMS" :active-id="workspace.view.value" @create="openCreateCommand" @toggle-resource="shell.toggleResource" @navigate="navigate" />
+      <ActivityBar
+        :items="VIEW_ITEMS"
+        :active-id="workspace.view.value"
+        :resource-open="shell.resourceOpen.value"
+        @create="openCreateCommand"
+        @toggle-resource="shell.toggleResource"
+        @navigate="navigate"
+      />
 
       <ResourceSidebar :open="shell.resourceOpen.value" @close="shell.closeOverlays">
-        <aside data-testid="sanctuary-sidebar" class="explorer">
+        <div data-testid="sanctuary-sidebar" class="explorer">
           <header class="explorer-brand">
             <div class="brand-mark"><BrainCircuit /></div>
-            <div><h1>Mneme</h1><p>Cognitive Sanctuary</p></div>
+            <div><h1>{{ resourceTitle }}</h1><p>{{ currentViewItem.hint }}</p></div>
           </header>
           <button class="new-research" @click="openCreateCommand"><Plus />{{ t("shell.newResearch") }}</button>
 
           <nav class="explorer-scroll">
+            <section v-if="workspace.view.value === 'ai'" data-testid="sidebar-group-chats">
+              <header><span>{{ t("nav.ai") }}</span></header>
+              <button
+                v-for="session in workspace.chatSessions.value.slice(0, 10)"
+                :key="session.id"
+                :class="{ active: workspace.activeChatSessionId.value === session.id }"
+                @click="workspace.selectChatSession(session.id)"
+              >
+                <strong>{{ session.title || "Untitled chat" }}</strong>
+                <small>{{ session.message_count }} messages · {{ formatDate(session.updated_at) }}</small>
+              </button>
+            </section>
+            <section v-else-if="workspace.view.value === 'notes' || workspace.view.value === 'graph'" data-testid="sidebar-group-context-files">
+              <header><span>{{ workspace.view.value === "graph" ? t("nav.graph") : t("shell.recentFiles") }}</span></header>
+              <button
+                v-for="doc in workspace.selectedDocuments.value.slice(0, 10)"
+                :key="doc.id"
+                @click="workspace.openDocument(doc.id)"
+              >
+                <strong>{{ doc.file_name }}</strong>
+                <small>{{ doc.status }} · {{ formatDate(doc.created_at) }}</small>
+              </button>
+            </section>
             <section data-testid="sidebar-group-vaults">
               <header><span>{{ t("shell.researchSpaces") }}</span><UiIconButton label="Create vault" size="sm" @click="openCreateCommand"><Plus /></UiIconButton></header>
               <button v-for="vault in workspace.knowledgeBases.value" :key="vault.id" :class="{ active: workspace.selectedKnowledgeBaseId.value === vault.id }" @click="workspace.selectKnowledgeBase(vault.id)">
                 <strong>{{ vault.name }}</strong><small>{{ vault.description || t("shell.noDescription") }}</small>
               </button>
             </section>
-            <section data-testid="sidebar-group-files">
+            <section v-if="workspace.view.value !== 'ai' && workspace.view.value !== 'notes' && workspace.view.value !== 'graph'" data-testid="sidebar-group-files">
               <header><span>{{ t("shell.recentFiles") }}</span></header>
               <button v-for="doc in workspace.selectedDocuments.value.slice(0, 6)" :key="doc.id" @click="workspace.openDocument(doc.id)"><strong>{{ doc.file_name }}</strong><small>{{ doc.status }} · {{ formatDate(doc.created_at) }}</small></button>
             </section>
@@ -131,39 +170,40 @@ function openCreateCommand() {
             <button @click="workspace.showSupportStatus"><LifeBuoy />{{ t("shell.support") }}</button>
             <div class="user-card"><div><UserRound /></div><span><strong>{{ workspace.user.value?.display_name || t("shell.previewUser") }}</strong><small>{{ workspace.user.value?.username }}</small></span></div>
           </footer>
-        </aside>
+        </div>
       </ResourceSidebar>
 
       <section class="mneme-shell__main">
-        <div class="notification-center">
-          <UiIconButton
-            data-testid="notification-center-toggle"
-            :label="workspace.notificationUnreadCount.value ? `${workspace.notificationUnreadCount.value} unread notifications` : 'Notifications'"
-            @click="workspace.toggleNotificationPanel"
-          >
-            <Bell />
-            <span v-if="workspace.notificationUnreadCount.value" class="notification-badge">{{ workspace.notificationUnreadCount.value > 9 ? "9+" : workspace.notificationUnreadCount.value }}</span>
-          </UiIconButton>
-          <section v-if="workspace.notificationPanelOpen.value" data-testid="notification-center-panel" class="notification-panel" aria-label="Notifications">
-            <header><strong>Notifications</strong><button type="button" @click="workspace.refreshNotifications">Refresh</button></header>
-            <p v-if="!workspace.notifications.value.length" class="notification-empty">You are all caught up.</p>
-            <button
-              v-for="notification in workspace.notifications.value"
-              :key="notification.id"
-              type="button"
-              class="notification-item"
-              :class="{ unread: !notification.read_at }"
-              @click="workspace.readNotification(notification.id)"
-            >
-              <span><strong>{{ notification.title }}</strong><small>{{ formatDate(notification.created_at) }}</small></span>
-              <p>{{ notification.body }}</p>
-            </button>
-          </section>
-        </div>
-        <header v-if="workspace.view.value !== 'graph' && workspace.view.value !== 'ai'" data-testid="sanctuary-topbar" class="workspace-topbar">
-          <div data-testid="sanctuary-active-view"><small>{{ currentViewItem.hint }}</small><h2>{{ currentViewItem.label }}</h2></div>
-          <div><span>{{ activeHealthLabel }}</span><UiIconButton label="Refresh panels" @click="workspace.loadKnowledgeBasePanels"><RefreshCw /></UiIconButton><UiIconButton label="Log out" @click="workspace.logout"><LogOut /></UiIconButton></div>
-        </header>
+        <WorkspaceToolbar
+          v-model:notifications-open="workspace.notificationPanelOpen.value"
+          :title="currentViewItem.label"
+          :hint="currentViewItem.hint"
+          :context="toolbarContext"
+          :health-label="activeHealthLabel"
+          :notification-count="workspace.notificationUnreadCount.value"
+          :compact="workspace.view.value === 'graph' || workspace.view.value === 'ai'"
+          @toggle-resources="shell.toggleResource"
+          @refresh="workspace.loadKnowledgeBasePanels"
+          @logout="workspace.logout"
+        >
+          <template #notifications>
+            <section data-testid="notification-center-panel" class="notification-panel" aria-label="Notifications">
+              <header><strong>Notifications</strong><button type="button" @click="workspace.refreshNotifications">Refresh</button></header>
+              <p v-if="!workspace.notifications.value.length" class="notification-empty">You are all caught up.</p>
+              <button
+                v-for="notification in workspace.notifications.value"
+                :key="notification.id"
+                type="button"
+                class="notification-item"
+                :class="{ unread: !notification.read_at }"
+                @click="workspace.readNotification(notification.id)"
+              >
+                <span><strong>{{ notification.title }}</strong><small>{{ formatDate(notification.created_at) }}</small></span>
+                <p>{{ notification.body }}</p>
+              </button>
+            </section>
+          </template>
+        </WorkspaceToolbar>
         <UiStatusPanel v-if="workspace.banner.value" class="workspace-banner" :title="workspace.banner.value" dismissible @dismiss="workspace.dismissBanner" />
         <UiStatusPanel v-if="workspace.authNotice.value" class="workspace-banner" :title="workspace.authNotice.value" />
         <UiStatusPanel v-if="workspace.documentActionStatus.value" class="workspace-banner" :title="workspace.documentActionStatus.value" />
@@ -194,7 +234,24 @@ function openCreateCommand() {
         <StatusBar :status="activeHealthLabel" :detail="workspace.selectedKnowledgeBase.value?.name" />
       </section>
 
-      <MobileNavigation :items="VIEW_ITEMS" :active-id="workspace.view.value" @toggle-resources="shell.toggleResource" @navigate="navigate" />
+      <MobileNavigation
+        :items="primaryNavigationItems"
+        :active-id="workspace.view.value"
+        :more-active="moreNavigationActive"
+        @open-more="shell.openMore"
+        @navigate="navigate"
+      />
+      <MoreNavigationSheet
+        :open="shell.moreOpen.value"
+        :items="secondaryNavigationItems"
+        :active-id="workspace.view.value"
+        :user-name="workspace.user.value?.display_name || t('shell.previewUser')"
+        @close="shell.closeMore"
+        @navigate="navigate"
+        @documentation="workspace.showDocumentationStatus"
+        @support="workspace.showSupportStatus"
+        @logout="workspace.logout"
+      />
     </div>
   </main>
 </template>
@@ -242,17 +299,9 @@ function openCreateCommand() {
 .user-card strong, .user-card small { display: block; }
 .user-card strong { font-size: 0.75rem; }
 .user-card small { color: var(--text-tertiary); font-size: 0.64rem; }
-.workspace-topbar { display: flex; min-height: 3.5rem; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 1rem; background: var(--bg-canvas); border-bottom: 1px solid var(--border-muted); }
-.workspace-topbar small { color: var(--text-tertiary); font: 0.62rem var(--font-mono); }
-.workspace-topbar h2 { margin: 0.12rem 0 0; font-size: 0.92rem; }
-.workspace-topbar > div:last-child { display: flex; align-items: center; gap: 0.3rem; }
-.workspace-topbar > div:last-child > span { padding: 0.25rem 0.4rem; color: var(--text-tertiary); border: 1px solid var(--border-muted); border-radius: 0.3rem; font: 0.62rem var(--font-mono); }
 .workspace-banner { width: 100%; min-width: 0; flex: 0 0 auto; margin: 0; padding: 0.55rem 1rem; color: var(--text-secondary); background: var(--accent-soft); border-width: 0 0 1px; border-radius: 0; font-size: 0.72rem; }
 .workspace-content { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
-.notification-center { position: absolute; z-index: 40; top: 0.62rem; right: 5.9rem; }
-.notification-center :deep(.ui-icon-button) { position: relative; background: var(--bg-panel); }
-.notification-badge { position: absolute; top: -0.28rem; right: -0.28rem; display: grid; min-width: 1rem; height: 1rem; place-items: center; padding: 0 0.18rem; color: white; background: var(--danger); border: 2px solid var(--bg-canvas); border-radius: 999px; font: 0.56rem var(--font-mono); }
-.notification-panel { position: absolute; top: 2.55rem; right: 0; width: min(22rem, calc(100vw - 1.5rem)); max-height: min(31rem, calc(100vh - 5rem)); overflow: auto; padding: 0.45rem; background: var(--bg-panel); border: 1px solid var(--border-muted); border-radius: 0.55rem; box-shadow: var(--shadow-float); }
+.notification-panel { width: min(22rem, calc(100vw - 2rem)); max-height: min(31rem, calc(100vh - 5rem)); overflow: auto; }
 .notification-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.55rem 0.6rem; border-bottom: 1px solid var(--border-muted); }
 .notification-panel > header strong { font-size: 0.78rem; }
 .notification-panel > header button { color: var(--text-tertiary); background: transparent; border: 0; font-size: 0.68rem; }
@@ -265,5 +314,4 @@ function openCreateCommand() {
 .notification-item p, .notification-empty { margin: 0.35rem 0 0; color: var(--text-secondary); font-size: 0.68rem; line-height: 1.45; }
 .notification-empty { padding: 1rem; text-align: center; }
 .workspace-loading { display: grid; width: min(100%, 900px); gap: 0.9rem; margin: 0 auto; padding: 2rem; }
-@media (max-width: 767px) { .workspace-topbar { padding-inline: 0.75rem; } .workspace-topbar > div:last-child > span { display: none; } .notification-center { right: 3.45rem; } }
 </style>

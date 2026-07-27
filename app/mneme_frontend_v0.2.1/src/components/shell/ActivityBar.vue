@@ -5,7 +5,7 @@ import UiIconButton from "../ui/UiIconButton.vue";
 
 export type ActivityItem = { id: string; label: string; icon: Component };
 
-defineProps<{ items: ActivityItem[]; activeId: string }>();
+defineProps<{ items: ActivityItem[]; activeId: string; resourceOpen: boolean }>();
 const emit = defineEmits<{ navigate: [id: string]; create: []; toggleResource: [] }>();
 </script>
 
@@ -13,18 +13,28 @@ const emit = defineEmits<{ navigate: [id: string]; create: []; toggleResource: [
   <aside data-testid="activity-bar" class="activity-bar" aria-label="Primary workspace">
     <div class="activity-bar__brand" aria-label="Mneme"><BrainCircuit class="size-5" /></div>
     <nav class="activity-bar__nav">
-      <UiIconButton label="Toggle resources" @click="emit('toggleResource')"><PanelLeft class="size-4" /></UiIconButton>
+      <UiIconButton
+        label="Toggle resources"
+        tooltip="Resources"
+        tooltip-side="right"
+        :active="resourceOpen"
+        :aria-expanded="resourceOpen"
+        aria-controls="workspace-resource-sidebar"
+        @click="emit('toggleResource')"
+      ><PanelLeft class="size-4" /></UiIconButton>
       <UiIconButton
         v-for="item in items"
         :key="item.id"
         :label="item.label"
+        :tooltip="item.label"
+        tooltip-side="right"
         :active="activeId === item.id"
         @click="emit('navigate', item.id)"
       >
         <component :is="item.icon" class="size-[18px]" />
       </UiIconButton>
     </nav>
-    <UiIconButton label="New research space" @click="emit('create')"><Plus class="size-4" /></UiIconButton>
+    <UiIconButton label="New research space" tooltip="New research space" tooltip-side="right" @click="emit('create')"><Plus class="size-4" /></UiIconButton>
   </aside>
 </template>
 
