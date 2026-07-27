@@ -39,7 +39,7 @@ const iconFor = (state: AgentRunTraceItem["state"]) =>
     </header>
 
     <div class="run-trace__meter" aria-hidden="true">
-      <i :style="{ width: `${items.length ? Math.max(8, (completedCount / items.length) * 100) : 8}%` }" />
+      <i :style="{ transform: `scaleX(${items.length ? Math.max(0.08, completedCount / items.length) : 0.08})` }" />
     </div>
 
     <details v-if="items.length > 1">
@@ -126,9 +126,11 @@ const iconFor = (state: AgentRunTraceItem["state"]) =>
 }
 .run-trace__meter i {
   display: block;
+  width: 100%;
   height: 100%;
   background: var(--accent-primary);
-  transition: width 180ms var(--ease-out-ui);
+  transform-origin: left;
+  transition: transform 180ms var(--ease-out-ui);
 }
 .run-trace details {
   margin-top: var(--space-3);

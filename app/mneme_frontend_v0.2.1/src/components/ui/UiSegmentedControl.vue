@@ -5,6 +5,7 @@ import { nextTick } from "vue";
 export type UiSegmentedOption = {
   value: string;
   label: string;
+  ariaLabel?: string;
   icon?: Component;
   disabled?: boolean;
 };
@@ -61,6 +62,7 @@ async function moveSelection(event: KeyboardEvent, currentIndex: number) {
       type="button"
       class="ui-segmented__option"
       :class="{ 'ui-segmented__option--active': model === option.value }"
+      :aria-label="option.ariaLabel"
       :aria-checked="model === option.value"
       :aria-pressed="model === option.value"
       :tabindex="tabIndexFor(option, index)"
