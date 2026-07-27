@@ -11,6 +11,7 @@ export function useResponsiveShell() {
   const isTablet = ref(tabletQuery.matches);
   const resourceOpen = ref(!(mobileQuery.matches || tabletQuery.matches));
   const contextOpen = ref(false);
+  const moreOpen = ref(false);
 
   function syncBreakpoints() {
     const nextMode = currentMode();
@@ -18,6 +19,7 @@ export function useResponsiveShell() {
     isTablet.value = tabletQuery.matches;
     if (nextMode !== lastMode) resourceOpen.value = nextMode === "desktop";
     lastMode = nextMode;
+    if (!isMobile.value) moreOpen.value = false;
     if (isMobile.value) contextOpen.value = false;
   }
 
@@ -29,7 +31,18 @@ export function useResponsiveShell() {
     contextOpen.value = !contextOpen.value;
   }
 
+  function openMore() {
+    moreOpen.value = true;
+    resourceOpen.value = false;
+    contextOpen.value = false;
+  }
+
+  function closeMore() {
+    moreOpen.value = false;
+  }
+
   function closeOverlays() {
+    moreOpen.value = false;
     if (isMobile.value || isTablet.value) {
       resourceOpen.value = false;
       contextOpen.value = false;
@@ -48,8 +61,11 @@ export function useResponsiveShell() {
     isTablet,
     resourceOpen,
     contextOpen,
+    moreOpen,
     toggleResource,
     toggleContext,
+    openMore,
+    closeMore,
     closeOverlays,
   };
 }

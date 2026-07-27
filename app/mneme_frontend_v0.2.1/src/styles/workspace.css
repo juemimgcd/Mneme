@@ -9,7 +9,7 @@
   .mneme-shell {
     display: grid;
     min-height: 100vh;
-    grid-template-columns: 52px 256px minmax(0, 1fr);
+    grid-template-columns: 52px 264px minmax(0, 1fr);
   }
 
   .mneme-shell--resource-closed {

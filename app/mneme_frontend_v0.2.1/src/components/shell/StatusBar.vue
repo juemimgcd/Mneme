@@ -3,7 +3,7 @@ defineProps<{ status: string; detail?: string }>();
 </script>
 
 <template>
-  <footer class="status-bar">
+  <footer class="status-bar" role="status" aria-live="polite">
     <span class="status-bar__dot" aria-hidden="true" />
     <span>{{ status }}</span>
     <span v-if="detail" class="status-bar__detail">{{ detail }}</span>
