@@ -3,6 +3,8 @@ import { ChevronRight, FileText, Folder, FolderOpen, MoreHorizontal } from "@luc
 import { computed, ref } from "vue";
 import type { DocumentFolderData, DocumentListItem } from "../../types";
 import { useI18n } from "../../composables/useI18n";
+import UiIconButton from "../ui/UiIconButton.vue";
+import UiPopover from "../ui/UiPopover.vue";
 
 const props = defineProps<{
   folder: DocumentFolderData;
@@ -68,17 +70,28 @@ function dropDocument(event: DragEvent) {
         <button type="button" draggable="true" @dragstart.stop="startDrag($event, document.id)" @dblclick="emit('openDocument', document.id)" @click="emit('openDocument', document.id)">
           <FileText /><span>{{ document.file_name }}</span><small v-if="document.version_number > 1">v{{ document.version_number }}</small>
         </button>
-        <button type="button" :aria-label="t('reader.moveDocument', { name: document.file_name })" @click="movingDocumentId = movingDocumentId === document.id ? '' : document.id" @keydown.esc.stop="movingDocumentId = ''"><MoreHorizontal /></button>
-        <div v-if="movingDocumentId === document.id" class="move-menu" role="listbox" :aria-label="t('reader.moveDocumentMenu')" @keydown.esc.stop="movingDocumentId = ''">
-          <button
-            v-for="target in folders.filter((item) => item.id !== folder.id)"
-            :key="target.id"
-            type="button"
-            role="option"
-            :aria-selected="false"
-            @click="emit('moveDocument', document.id, target.id); movingDocumentId = ''"
-          >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
-        </div>
+        <UiPopover
+          :model-value="movingDocumentId === document.id"
+          align="end"
+          role="listbox"
+          :ariaLabel="t('reader.moveDocumentMenu')"
+          @update:model-value="movingDocumentId = $event ? document.id : ''"
+        >
+          <template #trigger="{ props: triggerProps }">
+            <UiIconButton v-bind="triggerProps" size="sm" :label="t('reader.moveDocument', { name: document.file_name })"><MoreHorizontal /></UiIconButton>
+          </template>
+          <template #default="{ close }">
+            <div class="move-menu">
+              <button
+                v-for="target in folders.filter((item) => item.id !== folder.id)"
+                :key="target.id"
+                type="button"
+                role="option"
+                @click="emit('moveDocument', document.id, target.id); movingDocumentId = ''; close()"
+              >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
+            </div>
+          </template>
+        </UiPopover>
       </li>
       <DocumentTreeNode
         v-for="child in childFolders"
@@ -107,14 +120,20 @@ ul { margin: 0; padding: 0; list-style: none; }
 .folder-name { display: flex; min-width: 0; height: 1.9rem; align-items: center; gap: 0.4rem; padding: 0 0.3rem; text-align: left; }
 .folder-name svg, .document-row svg { width: 0.9rem; flex: 0 0 auto; color: var(--accent); }
 .folder-name span, .document-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.document-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 1.7rem; align-items: center; padding-left: calc(var(--tree-depth) * 0.72rem + 1.45rem); }
+.document-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 2rem; align-items: center; padding-left: calc(var(--tree-depth) * 0.72rem + 1.45rem); }
 .document-row.active { background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
+.document-row.active > button:first-child { color: var(--content-primary); font-weight: 600; }
 .document-row > button:first-child { display: flex; min-width: 0; height: 1.9rem; align-items: center; gap: 0.4rem; padding: 0 0.3rem; text-align: left; font-size: 0.73rem; }
-.document-row > button:last-of-type { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; opacity: 0; }
-.document-row:hover > button:last-of-type, .document-row:focus-within > button:last-of-type { opacity: 1; }
+.document-row :deep(.ui-popover__trigger) { opacity: 0; }
+.document-row:hover :deep(.ui-popover__trigger), .document-row:focus-within :deep(.ui-popover__trigger) { opacity: 1; }
 .document-row small { margin-left: auto; color: var(--accent); font: 0.58rem var(--font-mono); }
-.move-menu { position: absolute; z-index: 8; top: 1.8rem; right: 0.3rem; display: grid; min-width: 9rem; padding: 0.25rem; background: var(--bg-elevated); border: 1px solid var(--border-muted); border-radius: 0.4rem; box-shadow: var(--shadow-float); }
+.move-menu { display: grid; min-width: 10rem; gap: 0.15rem; }
 .move-menu button { padding: 0.45rem 0.55rem; color: var(--text-secondary); text-align: left; background: transparent; border: 0; border-radius: 0.25rem; font-size: 0.72rem; }
-.move-menu button:hover { color: var(--text-primary); background: var(--accent-soft); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) {
+  .move-menu button:hover { color: var(--content-primary); background: var(--surface-raised); }
+}
+@media (hover: none), (pointer: coarse) {
+  .document-row :deep(.ui-popover__trigger) { opacity: 1; }
+}
 </style>

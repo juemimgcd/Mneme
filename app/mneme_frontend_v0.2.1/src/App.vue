@@ -21,6 +21,8 @@ import MoreNavigationSheet from "./components/shell/MoreNavigationSheet.vue";
 import ResourceSidebar from "./components/shell/ResourceSidebar.vue";
 import StatusBar from "./components/shell/StatusBar.vue";
 import WorkspaceToolbar from "./components/shell/WorkspaceToolbar.vue";
+import UiButton from "./components/ui/UiButton.vue";
+import UiField from "./components/ui/UiField.vue";
 import UiIconButton from "./components/ui/UiIconButton.vue";
 import UiSkeleton from "./components/ui/UiSkeleton.vue";
 import UiStatusPanel from "./components/ui/UiStatusPanel.vue";
@@ -79,26 +81,62 @@ function openCreateCommand() {
 
 <template>
   <main v-if="!workspace.isAuthenticated.value" class="auth-screen">
-    <section class="auth-card">
-      <header><div class="auth-mark"><BrainCircuit /></div><div><h1>Mneme</h1><p>Personal knowledge, kept close.</p></div></header>
-      <div class="auth-mode" role="group" aria-label="Authentication mode">
-        <button type="button" :class="{ active: workspace.authMode.value === 'login' }" @click="workspace.setAuthMode('login')">{{ t("auth.login") }}</button>
-        <button type="button" :class="{ active: workspace.authMode.value === 'register' }" @click="workspace.setAuthMode('register')">{{ t("auth.register") }}</button>
-      </div>
-      <form v-if="workspace.authMode.value === 'login'" @submit.prevent="workspace.login">
-        <label><span>{{ t("auth.username") }}</span><input v-model="workspace.loginForm.value.username" autocomplete="username" required /></label>
-        <label><span>{{ t("auth.password") }}</span><input v-model="workspace.loginForm.value.password" type="password" autocomplete="current-password" required /></label>
-        <p v-if="workspace.authError.value" class="auth-error" aria-live="polite">{{ workspace.authError.value }}</p>
-        <button :disabled="workspace.authPending.value"><ShieldCheck />{{ workspace.authPending.value ? t("auth.signingIn") : t("auth.login") }}</button>
-      </form>
-      <form v-else @submit.prevent="workspace.register">
-        <label><span>{{ t("auth.username") }}</span><input v-model="workspace.registerForm.value.username" autocomplete="username" minlength="3" required /></label>
-        <label><span>{{ t("auth.displayName") }}</span><input v-model="workspace.registerForm.value.displayName" autocomplete="name" /></label>
-        <label><span>{{ t("auth.password") }}</span><input v-model="workspace.registerForm.value.password" type="password" autocomplete="new-password" minlength="8" required /></label>
-        <label><span>{{ t("auth.confirmPassword") }}</span><input v-model="workspace.registerForm.value.confirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
-        <p v-if="workspace.authError.value" class="auth-error" aria-live="polite">{{ workspace.authError.value }}</p>
-        <button :disabled="workspace.authPending.value"><ShieldCheck />{{ workspace.authPending.value ? t("auth.creatingAccount") : t("auth.createAccount") }}</button>
-      </form>
+    <section class="auth-layout">
+      <aside class="auth-story">
+        <header class="auth-brand"><div class="auth-mark"><BrainCircuit /></div><div><strong>Mneme</strong><span>{{ t("auth.brandKicker") }}</span></div></header>
+        <div class="auth-story__copy">
+          <p>{{ t("auth.brandKicker") }}</p>
+          <h1>{{ t("auth.brandTitle") }}</h1>
+          <span>{{ t("auth.brandDescription") }}</span>
+        </div>
+        <div class="auth-capabilities">
+          <div><BookOpen /><span>{{ t("auth.capability.capture") }}</span></div>
+          <div><Network /><span>{{ t("auth.capability.connect") }}</span></div>
+          <div><Brain /><span>{{ t("auth.capability.remember") }}</span></div>
+        </div>
+      </aside>
+
+      <section class="auth-card">
+        <header class="auth-card__brand"><div class="auth-mark"><BrainCircuit /></div><div><strong>Mneme</strong><span>{{ t("auth.brandKicker") }}</span></div></header>
+        <div class="auth-card__intro">
+          <h2>{{ t("auth.welcome") }}</h2>
+          <p>{{ workspace.authMode.value === "login" ? t("auth.loginDescription") : t("auth.registerDescription") }}</p>
+        </div>
+        <div class="auth-mode" role="group" :aria-label="t('auth.mode')">
+          <button type="button" :class="{ active: workspace.authMode.value === 'login' }" @click="workspace.setAuthMode('login')">{{ t("auth.login") }}</button>
+          <button type="button" :class="{ active: workspace.authMode.value === 'register' }" @click="workspace.setAuthMode('register')">{{ t("auth.register") }}</button>
+        </div>
+        <form v-if="workspace.authMode.value === 'login'" @submit.prevent="workspace.login">
+          <UiField :label="t('auth.username')" required :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.loginForm.value.username" autocomplete="username" /></template>
+          </UiField>
+          <UiField :label="t('auth.password')" required :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.loginForm.value.password" type="password" autocomplete="current-password" /></template>
+          </UiField>
+          <p v-if="workspace.authError.value" class="auth-error" role="alert">{{ workspace.authError.value }}</p>
+          <UiButton type="submit" variant="primary" :loading="workspace.authPending.value">
+            <template #icon><ShieldCheck /></template>{{ t("auth.login") }}
+          </UiButton>
+        </form>
+        <form v-else @submit.prevent="workspace.register">
+          <UiField :label="t('auth.username')" required :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.registerForm.value.username" autocomplete="username" minlength="3" /></template>
+          </UiField>
+          <UiField :label="t('auth.displayName')" :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.registerForm.value.displayName" autocomplete="name" /></template>
+          </UiField>
+          <UiField :label="t('auth.password')" required :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.registerForm.value.password" type="password" autocomplete="new-password" minlength="8" /></template>
+          </UiField>
+          <UiField :label="t('auth.confirmPassword')" required :disabled="workspace.authPending.value">
+            <template #default="{ props: fieldProps }"><input v-bind="fieldProps" v-model="workspace.registerForm.value.confirmPassword" type="password" autocomplete="new-password" minlength="8" /></template>
+          </UiField>
+          <p v-if="workspace.authError.value" class="auth-error" role="alert">{{ workspace.authError.value }}</p>
+          <UiButton type="submit" variant="primary" :loading="workspace.authPending.value">
+            <template #icon><ShieldCheck /></template>{{ t("auth.createAccount") }}
+          </UiButton>
+        </form>
+      </section>
     </section>
   </main>
 
@@ -175,13 +213,14 @@ function openCreateCommand() {
 
       <section class="mneme-shell__main">
         <WorkspaceToolbar
+          v-if="workspace.view.value !== 'graph'"
           v-model:notifications-open="workspace.notificationPanelOpen.value"
           :title="currentViewItem.label"
           :hint="currentViewItem.hint"
           :context="toolbarContext"
           :health-label="activeHealthLabel"
           :notification-count="workspace.notificationUnreadCount.value"
-          :compact="workspace.view.value === 'graph' || workspace.view.value === 'ai'"
+          :compact="workspace.view.value === 'ai'"
           @toggle-resources="shell.toggleResource"
           @refresh="workspace.loadKnowledgeBasePanels"
           @logout="workspace.logout"
@@ -218,10 +257,25 @@ function openCreateCommand() {
         </UiStatusPanel>
 
         <section data-testid="obsidian-editor-pane" class="workspace-content">
-          <div v-if="workspace.isLoading.value || activeViewLoading" class="workspace-loading" aria-label="Loading workspace">
-            <UiSkeleton width="38%" height="1.8rem" />
-            <UiSkeleton width="72%" height="0.8rem" />
-            <UiSkeleton width="100%" height="13rem" />
+          <div
+            v-if="workspace.isLoading.value || activeViewLoading"
+            class="workspace-loading"
+            :class="{ 'workspace-loading--dashboard': workspace.view.value === 'dashboard' }"
+            aria-label="Loading workspace"
+          >
+            <template v-if="workspace.view.value === 'dashboard'">
+              <div class="workspace-loading__hero">
+                <div><UiSkeleton width="28%" height="0.7rem" /><UiSkeleton width="62%" height="2.5rem" /><UiSkeleton width="88%" height="0.8rem" /></div>
+                <UiSkeleton width="100%" height="8.5rem" />
+              </div>
+              <div class="workspace-loading__metrics"><UiSkeleton v-for="index in 3" :key="index" width="100%" height="4.8rem" /></div>
+              <div class="workspace-loading__body"><UiSkeleton width="100%" height="18rem" /><UiSkeleton width="100%" height="22rem" /></div>
+            </template>
+            <template v-else>
+              <UiSkeleton width="38%" height="1.8rem" />
+              <UiSkeleton width="72%" height="0.8rem" />
+              <UiSkeleton width="100%" height="13rem" />
+            </template>
           </div>
           <DashboardView v-else-if="workspace.view.value === 'dashboard'" :workspace="workspace" />
           <VaultView v-else-if="workspace.view.value === 'notes'" :workspace="workspace" @create="openCreateCommand" />
@@ -257,24 +311,45 @@ function openCreateCommand() {
 </template>
 
 <style scoped>
-.auth-screen { display: grid; min-height: 100vh; place-items: center; padding: 1rem; background: var(--bg-canvas); color: var(--text-primary); }
-.auth-card { width: min(100%, 390px); padding: 1.5rem; background: var(--bg-panel); border: 1px solid var(--border-muted); border-radius: 0.65rem; box-shadow: var(--shadow-float); }
-.auth-card header { display: flex; align-items: center; gap: 0.8rem; }
+.auth-screen { display: grid; min-height: 100vh; place-items: center; padding: clamp(1rem, 4vw, 3rem); color: var(--content-primary); background: radial-gradient(circle at 22% 18%, color-mix(in srgb, var(--accent-primary) 9%, transparent), transparent 34rem), var(--surface-canvas); }
+.auth-layout { display: grid; width: min(100%, 1040px); grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 0.75fr); overflow: hidden; background: var(--surface-panel); border: 1px solid var(--stroke-subtle); border-radius: calc(var(--radius-panel) + 4px); box-shadow: var(--shadow-popover); }
+.auth-story { display: flex; min-height: 39rem; flex-direction: column; justify-content: space-between; padding: clamp(2rem, 5vw, 4rem); background: linear-gradient(145deg, color-mix(in srgb, var(--surface-sidebar) 88%, var(--accent-subtle)), var(--surface-sidebar)); border-right: 1px solid var(--stroke-subtle); }
+.auth-brand, .auth-card__brand { display: flex; align-items: center; gap: 0.75rem; }
+.auth-brand strong, .auth-brand span, .auth-card__brand strong, .auth-card__brand span { display: block; }
+.auth-brand strong, .auth-card__brand strong { font: 600 1rem var(--font-serif); }
+.auth-brand span, .auth-card__brand span { margin-top: 0.12rem; color: var(--content-tertiary); font-size: var(--font-size-xs); }
+.auth-story__copy { max-width: 31rem; }
+.auth-story__copy p { margin: 0; color: var(--accent-primary); font: 600 var(--font-size-xs) var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; }
+.auth-story__copy h1 { margin: 0.75rem 0 0; font: 600 clamp(2rem, 4vw, 3.5rem) var(--font-serif); line-height: 1.08; text-wrap: balance; }
+.auth-story__copy > span { display: block; max-width: 28rem; margin-top: 1rem; color: var(--content-secondary); line-height: 1.75; }
+.auth-capabilities { display: grid; gap: 0.75rem; }
+.auth-capabilities > div { display: flex; align-items: center; gap: 0.75rem; color: var(--content-secondary); font-size: var(--font-size-sm); }
+.auth-capabilities svg { width: 1rem; color: var(--accent-primary); }
+.auth-card { display: flex; flex-direction: column; justify-content: center; padding: clamp(1.5rem, 5vw, 3.25rem); }
+.auth-card__brand { display: none; }
 .auth-mark, .brand-mark { display: grid; width: 2.4rem; height: 2.4rem; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-muted)); border-radius: 0.5rem; }
 .auth-mark svg, .brand-mark svg { width: 1.1rem; }
-.auth-card h1, .auth-card p { margin: 0; }
-.auth-card h1 { font: 600 1.35rem var(--font-serif); }
-.auth-card p { margin-top: 0.15rem; color: var(--text-secondary); font-size: 0.78rem; }
-.auth-card form { display: grid; gap: 0.8rem; margin-top: 1.3rem; }
-.auth-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; margin-top: 1.3rem; padding: 0.2rem; background: var(--bg-canvas); border: 1px solid var(--border-muted); border-radius: 0.5rem; }
-.auth-mode button { min-height: 2.1rem; color: var(--text-secondary); background: transparent; border: 0; border-radius: 0.35rem; font-weight: 600; }
-.auth-mode button.active { color: var(--text-primary); background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); }
-.auth-card label { display: grid; gap: 0.3rem; color: var(--text-secondary); font-size: 0.75rem; }
-.auth-card input { height: 2.5rem; padding: 0 0.7rem; color: var(--text-primary); background: var(--bg-canvas); border: 1px solid var(--border-muted); border-radius: 0.4rem; }
-.auth-card form > button { display: flex; height: 2.5rem; align-items: center; justify-content: center; gap: 0.45rem; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: 0.4rem; }
-.auth-card form > button:disabled { cursor: wait; opacity: 0.58; }
-.auth-card form > button svg { width: 1rem; }
-.auth-error { color: var(--danger) !important; }
+.auth-card__intro h2 { margin: 0; font: 600 1.55rem var(--font-serif); }
+.auth-card__intro p { margin: 0.4rem 0 0; color: var(--content-secondary); font-size: var(--font-size-sm); line-height: 1.6; }
+.auth-card form { display: grid; gap: 0.8rem; margin-top: 1.2rem; }
+.auth-card form :deep(.ui-button) { width: 100%; margin-top: 0.15rem; }
+.auth-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem; margin-top: 1.35rem; padding: 0.2rem; background: var(--surface-sidebar); border: 1px solid var(--stroke-subtle); border-radius: var(--radius-control); }
+.auth-mode button { min-height: 2.15rem; color: var(--content-secondary); background: transparent; border: 0; border-radius: calc(var(--radius-control) - 2px); font-weight: 600; transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease, transform var(--duration-press) var(--ease-out-ui); }
+.auth-mode button.active { color: var(--content-primary); background: var(--surface-panel); box-shadow: inset 0 0 0 1px var(--stroke-subtle); }
+.auth-mode button:active:not(:focus-visible) { transform: scale(0.97); }
+.auth-error { margin: 0; color: var(--status-danger); font-size: var(--font-size-xs); line-height: 1.5; }
+@media (hover: hover) and (pointer: fine) { .auth-mode button:hover:not(.active) { color: var(--content-primary); background: var(--surface-raised); } }
+@media (max-width: 767px) {
+  .auth-screen { align-items: start; padding: 0; background: var(--surface-canvas); }
+  .auth-layout { display: block; width: 100%; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+  .auth-story { display: none; }
+  .auth-card { min-height: 100dvh; justify-content: start; padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(1.25rem, env(safe-area-inset-bottom)); }
+  .auth-card__brand { display: flex; margin-bottom: clamp(2.5rem, 12vh, 5rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-mode button { transition-property: color, background-color; }
+  .auth-mode button:active:not(:focus-visible) { transform: none; }
+}
 .explorer { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .explorer-brand { display: flex; align-items: center; gap: 0.7rem; padding: 1rem; }
 .explorer-brand h1 { margin: 0; font: 600 1.15rem var(--font-serif); }
@@ -314,4 +389,16 @@ function openCreateCommand() {
 .notification-item p, .notification-empty { margin: 0.35rem 0 0; color: var(--text-secondary); font-size: 0.68rem; line-height: 1.45; }
 .notification-empty { padding: 1rem; text-align: center; }
 .workspace-loading { display: grid; width: min(100%, 900px); gap: 0.9rem; margin: 0 auto; padding: 2rem; }
+.workspace-loading--dashboard { width: min(100%, 1160px); gap: 1.25rem; }
+.workspace-loading__hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.72fr); align-items: end; gap: clamp(1.25rem, 4vw, 3.5rem); }
+.workspace-loading__hero > div { display: grid; gap: 0.75rem; }
+.workspace-loading__metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; }
+.workspace-loading__body { display: grid; grid-template-columns: minmax(15rem, 0.7fr) minmax(0, 1.3fr); gap: 1rem; }
+@media (max-width: 900px) {
+  .workspace-loading__body { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .workspace-loading { padding: 1.1rem; }
+  .workspace-loading__hero, .workspace-loading__metrics { grid-template-columns: 1fr; }
+}
 </style>

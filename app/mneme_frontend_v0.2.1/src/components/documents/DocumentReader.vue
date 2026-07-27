@@ -2,6 +2,7 @@
 import { FileText, X } from "@lucide/vue";
 import type { DocumentContentData, DocumentTab } from "../../types";
 import DocumentContent from "./DocumentContent.vue";
+import UiButton from "../ui/UiButton.vue";
 import UiEmptyState from "../ui/UiEmptyState.vue";
 import UiSkeleton from "../ui/UiSkeleton.vue";
 import { useI18n } from "../../composables/useI18n";
@@ -50,7 +51,7 @@ const emit = defineEmits<{
       </UiEmptyState>
       <UiEmptyState v-else-if="phase === 'empty'" :title="t('reader.empty')" :description="t('reader.emptyDescription')" />
       <UiEmptyState v-else-if="phase === 'error'" :title="t('reader.unavailable')" :description="error || t('reader.unavailableDescription')">
-        <template #action><button type="button" @click="emit('download')">{{ t("reader.downloadOriginal") }}</button></template>
+        <template #action><UiButton variant="secondary" @click="emit('download')">{{ t("reader.downloadOriginal") }}</UiButton></template>
       </UiEmptyState>
       <DocumentContent v-else-if="content" :content="content" :blob-url="blobUrl" :blob-phase="blobPhase" :blob-error="blobError" @download="emit('download')" @retry="emit('retry')" />
     </section>
@@ -71,12 +72,14 @@ const emit = defineEmits<{
 .reader-tab.active > button:first-child { color: var(--text-primary); }
 .reader-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.72rem; }
 .reader-tab svg { width: 0.85rem; flex: 0 0 auto; }
-.reader-tab > button:last-child { display: grid; width: 1.8rem; height: 100%; place-items: center; color: var(--text-tertiary); background: transparent; border: 0; }
-.reader-tab > button:last-child:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.reader-tab > button:last-child { display: grid; width: 1.8rem; height: 100%; place-items: center; color: var(--text-tertiary); background: transparent; border: 0; opacity: 0; pointer-events: none; transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease, opacity var(--duration-fast) ease; }
+.reader-tab.active > button:last-child, .reader-tab:hover > button:last-child, .reader-tab:focus-within > button:last-child { opacity: 1; pointer-events: auto; }
 .reader-body { min-height: 0; overflow: auto; }
 .reader-loading { display: grid; width: min(100%, 760px); gap: 1rem; margin: 0 auto; padding: clamp(2rem, 6vw, 5rem); }
 .reader-status { display: flex; min-height: 1.75rem; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 0.7rem; color: var(--text-tertiary); background: var(--bg-sidebar); border-top: 1px solid var(--border-muted); font: 0.62rem var(--font-mono); }
 .reader-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reader button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .reader-tab > button:last-child:hover { color: var(--text-primary); background: var(--bg-elevated); } }
+@media (hover: none), (pointer: coarse) { .reader-tab > button:last-child { opacity: 1; pointer-events: auto; } }
 @media (max-width: 767px) { .reader-tabs { min-height: 2.25rem; } .reader-tab > button:first-child { max-width: 10rem; } .reader-status span:last-child { display: none; } }
 </style>
