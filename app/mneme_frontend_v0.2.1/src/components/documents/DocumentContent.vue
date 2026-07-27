@@ -4,6 +4,7 @@ import { marked } from "marked";
 import { computed } from "vue";
 import type { DocumentContentData } from "../../types";
 import { useI18n } from "../../composables/useI18n";
+import UiButton from "../ui/UiButton.vue";
 
 const props = defineProps<{
   content: DocumentContentData;
@@ -48,7 +49,7 @@ const safeMarkdown = computed(() => {
   <div class="document-content">
     <div v-if="content.parse_warning" class="reader-warning" role="status">
       <span>{{ content.parse_warning }}</span>
-      <button type="button" @click="emit('download')">{{ t("reader.downloadOriginal") }}</button>
+      <UiButton size="sm" variant="ghost" @click="emit('download')">{{ t("reader.downloadOriginal") }}</UiButton>
     </div>
 
     <article
@@ -73,34 +74,41 @@ const safeMarkdown = computed(() => {
     />
     <section v-else-if="content.render_mode === 'pdf' && blobPhase === 'error'" data-testid="document-pdf-error" class="reader-placeholder" role="alert">
       <p>{{ pdfErrorText }}</p>
-      <div><button type="button" @click="emit('retry')">{{ t("reader.retryPdf") }}</button><button type="button" @click="emit('download')">{{ t("reader.downloadOriginal") }}</button></div>
+      <div><UiButton variant="primary" @click="emit('retry')">{{ t("reader.retryPdf") }}</UiButton><UiButton variant="secondary" @click="emit('download')">{{ t("reader.downloadOriginal") }}</UiButton></div>
     </section>
     <section v-else-if="content.render_mode === 'pdf'" class="reader-placeholder" aria-live="polite">
       {{ t("reader.pdfLoading") }}
     </section>
     <section v-else class="reader-placeholder">
       <p>{{ t("reader.unsupported") }}</p>
-      <button type="button" @click="emit('download')">{{ t("reader.downloadOriginal") }}</button>
+      <UiButton variant="secondary" @click="emit('download')">{{ t("reader.downloadOriginal") }}</UiButton>
     </section>
   </div>
 </template>
 
 <style scoped>
 .document-content { min-height: 100%; }
-.prose { width: min(100%, 74ch); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) clamp(1.25rem, 6vw, 5.5rem) 6rem; color: var(--text-primary); font-size: 0.96rem; line-height: 1.8; }
-.prose :deep(h1), .prose :deep(h2), .prose :deep(h3) { color: var(--text-primary); font-family: var(--font-serif); line-height: 1.2; letter-spacing: -0.012em; }
+.prose { width: min(100%, 72ch); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) clamp(1.25rem, 6vw, 5.5rem) 6rem; color: var(--text-primary); font-size: 1rem; line-height: 1.7; }
+.prose :deep(h1), .prose :deep(h2), .prose :deep(h3), .prose :deep(h4) { color: var(--text-primary); font-family: var(--font-serif); line-height: 1.22; letter-spacing: -0.012em; }
 .prose :deep(h1) { margin: 0 0 1.8rem; font-size: clamp(2rem, 4vw, 3.25rem); font-weight: 600; }
 .prose :deep(h2) { margin: 2.4rem 0 0.8rem; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border-muted); font-size: 1.45rem; }
+.prose :deep(h3) { margin: 2rem 0 0.65rem; font-size: 1.15rem; }
+.prose :deep(h4) { margin: 1.6rem 0 0.5rem; font-size: 1rem; }
 .prose :deep(p), .prose :deep(ul), .prose :deep(ol), .prose :deep(blockquote) { margin: 0 0 1.2rem; }
+.prose :deep(li + li) { margin-top: 0.35rem; }
 .prose :deep(blockquote) { padding-left: 1rem; color: var(--text-secondary); border-left: 2px solid var(--accent); }
 .prose :deep(code) { padding: 0.12rem 0.3rem; background: var(--bg-elevated); border-radius: 0.25rem; font: 0.88em var(--font-mono); }
 .prose :deep(pre) { overflow: auto; padding: 1rem; background: var(--bg-sidebar); border: 1px solid var(--border-muted); border-radius: 0.45rem; }
 .prose :deep(a) { color: var(--accent); text-underline-offset: 0.2em; }
+.prose :deep(hr) { margin: 2rem 0; border: 0; border-top: 1px solid var(--stroke-subtle); }
+.prose :deep(table) { display: block; width: 100%; margin: 1.5rem 0; overflow-x: auto; border-collapse: collapse; font-size: var(--font-size-sm); }
+.prose :deep(th), .prose :deep(td) { padding: 0.6rem 0.75rem; border: 1px solid var(--stroke-subtle); text-align: left; vertical-align: top; }
+.prose :deep(th) { background: var(--surface-sidebar); font-weight: 650; }
 pre[data-testid] { min-height: 100%; margin: 0; padding: clamp(1.5rem, 5vw, 4rem); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; background: transparent; font: 0.88rem/1.75 var(--font-mono); }
 iframe { display: block; width: 100%; height: 100%; min-height: 34rem; border: 0; background: var(--bg-panel); }
 .reader-warning { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.65rem 1rem; color: var(--warning, var(--text-secondary)); background: color-mix(in srgb, var(--warning, #c99b55) 10%, var(--bg-panel)); border-bottom: 1px solid var(--border-muted); font-size: 0.76rem; }
-.reader-warning button, .reader-placeholder button { color: var(--accent); background: transparent; border: 0; text-decoration: underline; text-underline-offset: 0.2em; }
 .reader-placeholder { display: grid; min-height: 24rem; place-items: center; align-content: center; gap: 0.8rem; color: var(--text-secondary); }
+.reader-placeholder > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 767px) { .prose { padding: 1.5rem 1rem 5rem; } iframe { min-height: calc(100dvh - 12rem); } }
 </style>

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { FileText, FolderInput, FolderOpen, Pencil, Plus, Trash2, Upload } from "@lucide/vue";
+import { FileText, FolderInput, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2, Upload } from "@lucide/vue";
 import { computed, ref } from "vue";
 import type { DocumentFolderData, DocumentListItem } from "../../types";
 import DocumentTreeNode from "./DocumentTreeNode.vue";
 import { useI18n } from "../../composables/useI18n";
+import UiIconButton from "../ui/UiIconButton.vue";
+import UiPopover from "../ui/UiPopover.vue";
 
 const { t } = useI18n();
 
@@ -119,19 +121,29 @@ function triggerUpload() {
     </header>
     <div class="tree-toolbar">
       <button type="button" @click="creating = !creating; renaming = false; folderName = ''"><Plus />{{ t("reader.newFolder") }}</button>
-      <button type="button" :disabled="!selectedFolder || selectedFolder.is_root" :aria-label="t('reader.renameFolder')" @click="renaming = !renaming; creating = false; folderName = selectedFolder?.name ?? ''"><Pencil /></button>
-      <button type="button" :disabled="!selectedFolder || selectedFolder.is_root" :aria-label="t('reader.moveFolder')" @click="movingFolder = !movingFolder"><FolderInput /></button>
-      <button type="button" :disabled="!selectedFolder || selectedFolder.is_root" :aria-label="t('reader.deleteFolder')" @click="selectedFolder && emit('deleteFolder', selectedFolder.id)"><Trash2 /></button>
-    </div>
-    <div v-if="movingFolder && selectedFolder" class="folder-move-menu" role="listbox" :aria-label="t('reader.moveFolder')" @keydown.esc.stop="movingFolder = false">
-      <button
-        v-for="target in flatFolders.filter((item) => item.id !== selectedFolder?.id)"
-        :key="target.id"
-        type="button"
-        role="option"
-        :aria-selected="false"
-        @click="requestFolderMove(selectedFolder.id, target.id); movingFolder = false"
-      >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
+      <UiPopover align="end" role="menu" :ariaLabel="t('reader.folderActions')" :disabled="!selectedFolder || selectedFolder.is_root" @close="movingFolder = false">
+        <template #trigger="{ props: triggerProps }">
+          <UiIconButton v-bind="triggerProps" size="sm" :label="t('reader.folderActions')" :disabled="!selectedFolder || selectedFolder.is_root"><MoreHorizontal /></UiIconButton>
+        </template>
+        <template #default="{ close }">
+          <div v-if="selectedFolder" class="folder-action-menu">
+            <template v-if="!movingFolder">
+              <button type="button" @click="renaming = true; creating = false; folderName = selectedFolder.name; close()"><Pencil />{{ t("reader.renameFolder") }}</button>
+              <button type="button" @click="movingFolder = true"><FolderInput />{{ t("reader.moveFolder") }}</button>
+              <button type="button" class="danger" @click="emit('deleteFolder', selectedFolder.id); close()"><Trash2 />{{ t("reader.deleteFolder") }}</button>
+            </template>
+            <template v-else>
+              <span>{{ t("reader.moveFolder") }}</span>
+              <button
+                v-for="target in flatFolders.filter((item) => item.id !== selectedFolder?.id)"
+                :key="target.id"
+                type="button"
+                @click="requestFolderMove(selectedFolder.id, target.id); movingFolder = false; close()"
+              >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
+            </template>
+          </div>
+        </template>
+      </UiPopover>
     </div>
     <form v-if="creating || renaming" class="folder-form" @submit.prevent="creating ? submitCreate() : submitRename()">
       <label for="folder-name">{{ t("reader.folderName") }}</label>
@@ -147,17 +159,28 @@ function triggerUpload() {
           <ul role="group">
         <li v-for="document in rootDocuments" :key="document.id" role="treeitem" class="root-document" :class="{ active: activeDocumentId === document.id }">
           <button type="button" draggable="true" @dragstart="startRootDrag($event, document.id)" @click="emit('openDocument', document.id)"><FileText /><span>{{ document.file_name }}</span><small v-if="document.version_number > 1">v{{ document.version_number }}</small></button>
-          <button type="button" :aria-label="t('reader.moveDocument', { name: document.file_name })" @click="movingRootDocumentId = movingRootDocumentId === document.id ? '' : document.id" @keydown.esc.stop="movingRootDocumentId = ''"><FolderInput /></button>
-          <div v-if="movingRootDocumentId === document.id" class="root-move-menu" role="listbox" :aria-label="t('reader.moveDocumentMenu')" @keydown.esc.stop="movingRootDocumentId = ''">
-            <button
-              v-for="target in flatFolders.filter((item) => !item.is_root)"
-              :key="target.id"
-              type="button"
-              role="option"
-              :aria-selected="false"
-              @click="emit('moveDocument', document.id, target.id); movingRootDocumentId = ''"
-            >{{ target.name }}</button>
-          </div>
+          <UiPopover
+            :model-value="movingRootDocumentId === document.id"
+            align="end"
+            role="listbox"
+            :ariaLabel="t('reader.moveDocumentMenu')"
+            @update:model-value="movingRootDocumentId = $event ? document.id : ''"
+          >
+            <template #trigger="{ props: triggerProps }">
+              <UiIconButton v-bind="triggerProps" size="sm" :label="t('reader.moveDocument', { name: document.file_name })"><FolderInput /></UiIconButton>
+            </template>
+            <template #default="{ close }">
+              <div class="root-move-menu">
+                <button
+                  v-for="target in flatFolders.filter((item) => !item.is_root)"
+                  :key="target.id"
+                  type="button"
+                  role="option"
+                  @click="emit('moveDocument', document.id, target.id); movingRootDocumentId = ''; close()"
+                >{{ target.name }}</button>
+              </div>
+            </template>
+          </UiPopover>
         </li>
         <DocumentTreeNode
           v-for="folder in topFolders"
@@ -188,7 +211,7 @@ function triggerUpload() {
 .upload-control { display: inline-flex; min-width: 2rem; min-height: 2rem; align-items: center; justify-content: center; gap: 0.3rem; padding: 0 0.45rem; color: var(--text-secondary); border: 1px solid var(--border-muted); border-radius: 0.35rem; cursor: pointer; font-size: 0.65rem; }
 .upload-control:hover { color: var(--accent); background: var(--accent-soft); }
 .upload-control svg { width: 0.9rem; }
-.tree-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 2rem 2rem 2rem; gap: 0.25rem; padding: 0.5rem; border-bottom: 1px solid var(--border-muted); }
+.tree-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem; padding: 0.5rem; border-bottom: 1px solid var(--border-muted); }
 .tree-toolbar button { display: flex; min-height: 2rem; align-items: center; justify-content: center; gap: 0.35rem; color: var(--text-secondary); background: transparent; border: 1px solid transparent; border-radius: 0.35rem; font-size: 0.68rem; }
 .tree-toolbar button:first-child { justify-content: flex-start; padding: 0 0.5rem; }
 .tree-toolbar button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-elevated); border-color: var(--border-muted); }
@@ -199,26 +222,33 @@ function triggerUpload() {
 .folder-form input { min-width: 0; height: 2rem; padding: 0 0.5rem; color: var(--text-primary); background: var(--bg-canvas); border: 1px solid var(--accent); border-radius: 0.3rem; }
 .folder-form div { display: flex; gap: 0.3rem; }
 .folder-form button { padding: 0.35rem 0.5rem; color: var(--text-secondary); background: transparent; border: 1px solid var(--border-muted); border-radius: 0.3rem; font-size: 0.65rem; }
-.folder-move-menu { display: grid; gap: 0.15rem; padding: 0.35rem 0.5rem; background: var(--bg-panel); border-bottom: 1px solid var(--border-muted); }
-.folder-move-menu button { padding: 0.4rem 0.5rem; color: var(--text-secondary); text-align: left; background: transparent; border: 0; border-radius: 0.3rem; font-size: 0.7rem; }
-.folder-move-menu button:hover { color: var(--text-primary); background: var(--accent-soft); }
+.folder-action-menu, .root-move-menu { display: grid; min-width: 11rem; gap: 0.15rem; }
+.folder-action-menu > span { padding: 0.35rem 0.5rem; color: var(--content-tertiary); font: 600 var(--font-size-xs) var(--font-mono); }
+.folder-action-menu button, .root-move-menu button { display: flex; min-height: 2.2rem; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; color: var(--content-secondary); text-align: left; background: transparent; border: 0; border-radius: var(--radius-control); font-size: var(--font-size-xs); }
+.folder-action-menu button.danger { color: var(--status-danger); }
+.folder-action-menu svg { width: 0.9rem; }
 .tree-error { margin: 0; padding: 0.55rem 0.7rem; color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); border-bottom: 1px solid var(--border-muted); font-size: 0.68rem; }
 .tree-scroll { height: calc(100% - 7rem); overflow: auto; padding: 0.35rem 0; }
 .tree-scroll ul { margin: 0; padding: 0; list-style: none; }
 .root-name { display: flex; width: 100%; min-height: 1.9rem; align-items: center; gap: 0.4rem; padding: 0 0.65rem; color: var(--text-secondary); background: transparent; border: 0; font-size: 0.7rem; text-align: left; }
 .root-name svg { width: 0.9rem; color: var(--accent); }
-.root-document { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 1.7rem; align-items: center; padding-left: 1.45rem; }
+.root-document { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 2rem; align-items: center; padding-left: 1.45rem; }
 .root-document.active { background: var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
-.root-document button { color: var(--text-secondary); background: transparent; border: 0; }
-.root-document button:first-child { display: flex; min-width: 0; height: 1.9rem; align-items: center; gap: 0.4rem; text-align: left; }
-.root-document button:last-child { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; opacity: 0; }
-.root-document:hover button:last-child, .root-document:focus-within button:last-child { opacity: 1; }
+.root-document.active > button:first-child { color: var(--content-primary); font-weight: 600; }
+.root-document > button { color: var(--text-secondary); background: transparent; border: 0; }
+.root-document > button:first-child { display: flex; min-width: 0; height: 1.9rem; align-items: center; gap: 0.4rem; text-align: left; }
+.root-document :deep(.ui-popover__trigger) { opacity: 0; }
+.root-document:hover :deep(.ui-popover__trigger), .root-document:focus-within :deep(.ui-popover__trigger) { opacity: 1; }
 .root-document svg { width: 0.85rem; color: var(--accent); }
 .root-document span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.73rem; }
 .root-document small { margin-left: auto; color: var(--accent); }
-.root-move-menu { position: absolute; z-index: 8; top: 1.8rem; right: 0.3rem; display: grid; min-width: 9rem; padding: 0.25rem; background: var(--bg-elevated); border: 1px solid var(--border-muted); border-radius: 0.4rem; box-shadow: var(--shadow-float); }
-.root-move-menu button { padding: 0.45rem 0.55rem; color: var(--text-secondary); text-align: left; background: transparent; border: 0; border-radius: 0.25rem; font-size: 0.72rem; }
-.root-move-menu button:hover { color: var(--text-primary); background: var(--accent-soft); }
 .tree-empty { padding: 1rem; color: var(--text-tertiary); font-size: 0.72rem; text-align: center; }
 button:focus-visible, label:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (hover: hover) and (pointer: fine) {
+  .folder-action-menu button:hover, .root-move-menu button:hover { color: var(--content-primary); background: var(--surface-raised); }
+  .folder-action-menu button.danger:hover { color: var(--status-danger); background: color-mix(in srgb, var(--status-danger) 10%, transparent); }
+}
+@media (hover: none), (pointer: coarse) {
+  .root-document :deep(.ui-popover__trigger) { opacity: 1; }
+}
 </style>

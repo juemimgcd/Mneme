@@ -17,6 +17,7 @@ const inputProps = computed(() => ({
   id: inputId,
   disabled: props.disabled,
   required: props.required,
+  "aria-label": props.label,
   "aria-describedby": describedBy.value,
   "aria-invalid": props.error ? true : undefined,
 }));
