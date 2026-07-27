@@ -48,21 +48,21 @@ async function moveSelection(event: KeyboardEvent, currentIndex: number) {
   const next = available[nextPosition];
   select(next.option);
   await nextTick();
-  const group = (event.currentTarget as HTMLElement).closest('[role="radiogroup"]');
-  group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next.index]?.focus();
+  const group = (event.currentTarget as HTMLElement).closest('[role="group"]');
+  group?.querySelectorAll<HTMLButtonElement>('button')[next.index]?.focus();
 }
 </script>
 
 <template>
-  <div class="ui-segmented" :class="`ui-segmented--${size}`" role="radiogroup" :aria-label="ariaLabel" :aria-disabled="disabled || undefined">
+  <div class="ui-segmented" :class="`ui-segmented--${size}`" role="group" :aria-label="ariaLabel" :aria-disabled="disabled || undefined">
     <button
       v-for="(option, index) in options"
       :key="option.value"
       type="button"
-      role="radio"
       class="ui-segmented__option"
       :class="{ 'ui-segmented__option--active': model === option.value }"
       :aria-checked="model === option.value"
+      :aria-pressed="model === option.value"
       :tabindex="tabIndexFor(option, index)"
       :disabled="disabled || option.disabled"
       @click="select(option)"
