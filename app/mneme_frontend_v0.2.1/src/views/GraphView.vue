@@ -518,6 +518,7 @@ function edgeFocusState(source: string, target: string) {
   .graph-toolbar form { width: 100%; }
   .graph-tabs { grid-column: 1 / -1; overflow-x: auto; }
   .graph-status { top: 10.75rem; }
+  .graph-stage > :deep(.ui-empty-state) { min-height: 100%; padding-top: 9rem; padding-bottom: 6rem; }
   .graph-stage > svg { min-height: 560px; }
   .zoom-controls { right: 0.75rem; bottom: 4.25rem; }
 }

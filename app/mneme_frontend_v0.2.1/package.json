@@ -12,6 +12,7 @@
     "lint": "vue-tsc --noEmit",
     "test:contracts": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
+    "test:quality": "playwright test tests/final-quality-gates.spec.ts --workers=1",
     "dev:preview": "vite --mode preview --port=3000 --host=0.0.0.0 --config vite.config.mjs --configLoader native"
   },
   "dependencies": {

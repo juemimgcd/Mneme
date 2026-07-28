@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { getDocumentAction, openMoreAction } from "./helpers/navigation";
 
 const envelope = (data: unknown) => ({ code: 0, message: "ok", data });
 
@@ -50,19 +51,19 @@ test("index monitoring reaches terminal success and refreshes notes again", asyn
   const calls = await routeIndexWorkspace(page, ["running", "succeeded"]);
   await loginAndOpenVault(page);
 
-  await page.getByRole("button", { name: "Index", exact: true }).click();
+  await (await getDocumentAction(page, "Index")).click();
 
   await expect(page.getByRole("status").filter({ hasText: "Indexing completed" })).toBeVisible();
   await expect.poll(calls.taskCalls).toBe(2);
   await expect.poll(calls.documentCalls).toBeGreaterThanOrEqual(2);
-  await expect(page.getByRole("button", { name: "Index", exact: true })).toBeDisabled();
+  await expect(await getDocumentAction(page, "Index")).toBeDisabled();
 });
 
 test("index monitoring stops at failure and surfaces the task error", async ({ page }) => {
   const calls = await routeIndexWorkspace(page, ["running", "failed"]);
   await loginAndOpenVault(page);
 
-  await page.getByRole("button", { name: "Index", exact: true }).click();
+  await (await getDocumentAction(page, "Index")).click();
 
   await expect(page.getByRole("status").filter({ hasText: "Indexing failed: Parser failed" })).toBeVisible();
   await expect.poll(calls.taskCalls).toBe(2);
@@ -71,10 +72,10 @@ test("index monitoring stops at failure and surfaces the task error", async ({ p
 test("logout cancels an active bounded index monitor", async ({ page }) => {
   const calls = await routeIndexWorkspace(page, ["running"]);
   await loginAndOpenVault(page);
-  await page.getByRole("button", { name: "Index", exact: true }).click();
+  await (await getDocumentAction(page, "Index")).click();
   await expect.poll(calls.taskCalls).toBeGreaterThan(0);
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await openMoreAction(page, "Log out");
   const callsAtLogout = calls.taskCalls();
   await page.waitForTimeout(900);
   expect(calls.taskCalls()).toBe(callsAtLogout);

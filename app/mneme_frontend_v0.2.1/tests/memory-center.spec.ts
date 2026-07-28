@@ -1,9 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openMemoryCenter(page: Page) {
+  const desktopButton = page.getByTestId('activity-bar').getByRole('button', { name: /Memory Center|Memory \(/ });
+  if (await desktopButton.isVisible()) {
+    await desktopButton.click();
+    return;
+  }
+  await page.getByTestId('mobile-navigation').getByRole('button', { name: 'Open more navigation' }).click();
+  await page.getByTestId('more-navigation-sheet').getByRole('button', { name: /Memory Center|Memory \(/ }).click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto('/?preview=1', { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /Memory Center|Memory \(/ }).click();
+  await openMemoryCenter(page);
   await expect(page.locator('.memory-center > header h1')).toContainText('Memory Center');
 });
 

@@ -1,4 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function openAdditionalView(page: Page, name: string) {
+  const desktopButton = page.getByTestId("activity-bar").getByRole("button", { name, exact: true });
+  if (await desktopButton.isVisible()) {
+    await desktopButton.click();
+    return;
+  }
+  await page.getByTestId("mobile-navigation").getByRole("button", { name: "Open more navigation" }).click();
+  await page.getByTestId("more-navigation-sheet").getByRole("button", { name, exact: true }).click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => window.localStorage.clear());
@@ -57,7 +67,7 @@ test("multi-agent preference is optional and survives an answer refresh", async 
 });
 
 test("settings manages Feishu binding, routing, and delivery retry", async ({ page }) => {
-  await page.getByRole("button", { name: "System Settings", exact: true }).click();
+  await openAdditionalView(page, "System Settings");
 
   const panel = page.getByTestId("channel-gateway-panel");
   await expect(panel).toBeVisible();

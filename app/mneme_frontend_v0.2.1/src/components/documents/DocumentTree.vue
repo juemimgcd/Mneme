@@ -145,9 +145,9 @@ function confirmFolderDelete() {
         <template #default="{ close }">
           <div v-if="selectedFolder" class="folder-action-menu">
             <template v-if="!movingFolder">
-              <button type="button" @click="renaming = true; creating = false; folderName = selectedFolder.name; close()"><Pencil />{{ t("reader.renameFolder") }}</button>
-              <button type="button" @click="movingFolder = true"><FolderInput />{{ t("reader.moveFolder") }}</button>
-              <button type="button" class="danger" @click="requestFolderDelete(selectedFolder, close)"><Trash2 />{{ t("reader.deleteFolder") }}</button>
+              <button type="button" role="menuitem" @click="renaming = true; creating = false; folderName = selectedFolder.name; close()"><Pencil />{{ t("reader.renameFolder") }}</button>
+              <button type="button" role="menuitem" @click="movingFolder = true"><FolderInput />{{ t("reader.moveFolder") }}</button>
+              <button type="button" role="menuitem" class="danger" @click="requestFolderDelete(selectedFolder, close)"><Trash2 />{{ t("reader.deleteFolder") }}</button>
             </template>
             <template v-else>
               <span>{{ t("reader.moveFolder") }}</span>
@@ -155,6 +155,7 @@ function confirmFolderDelete() {
                 v-for="target in flatFolders.filter((item) => item.id !== selectedFolder?.id)"
                 :key="target.id"
                 type="button"
+                role="menuitem"
                 @click="requestFolderMove(selectedFolder.id, target.id); movingFolder = false; close()"
               >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
             </template>

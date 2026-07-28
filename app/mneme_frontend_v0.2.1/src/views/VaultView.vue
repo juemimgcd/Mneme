@@ -118,7 +118,7 @@ watch(
   () => props.workspace.activeDocumentId.value,
   (documentId) => {
     if (documentId && window.matchMedia("(max-width: 1100px)").matches) treeOpen.value = false;
-    if (documentId) void nextTick(() => document.querySelector<HTMLElement>('[data-testid="document-reader"]')?.focus());
+    if (documentId) void nextTick(() => document.querySelector<HTMLElement>('[data-testid="document-reader"]')?.focus({ preventScroll: true }));
   },
   { immediate: true },
 );
@@ -237,9 +237,9 @@ onBeforeUnmount(() => {
             </template>
             <template #default="{ close }">
               <div class="document-action-menu">
-                <button type="button" @click="workspace.downloadDocument(); close()"><Download />{{ t("reader.download") }}</button>
-                <button type="button" :disabled="workspace.documentPreview.value?.status === 'indexed' || Boolean(actionPending)" @click="indexActiveDocument(); close()"><WandSparkles />{{ t("reader.index") }}</button>
-                <button type="button" class="danger" @click="deleteDialogOpen = true; close()"><Trash2 />{{ t("reader.delete") }}</button>
+                <button type="button" role="menuitem" @click="workspace.downloadDocument(); close()"><Download />{{ t("reader.download") }}</button>
+                <button type="button" role="menuitem" :disabled="workspace.documentPreview.value?.status === 'indexed' || Boolean(actionPending)" @click="indexActiveDocument(); close()"><WandSparkles />{{ t("reader.index") }}</button>
+                <button type="button" role="menuitem" class="danger" @click="deleteDialogOpen = true; close()"><Trash2 />{{ t("reader.delete") }}</button>
               </div>
             </template>
           </UiPopover>

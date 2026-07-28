@@ -57,6 +57,7 @@ function onDocumentPointerDown(event: PointerEvent) {
 function onDocumentKeyDown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
   event.preventDefault();
+  event.stopPropagation();
   close(true);
 }
 
@@ -103,14 +104,14 @@ function originForPlacement(placement: PopoverPlacement, align: PopoverAlign) {
 
 function addListeners() {
   document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("keydown", onDocumentKeyDown);
+  document.addEventListener("keydown", onDocumentKeyDown, true);
   window.addEventListener("resize", updatePosition);
   window.addEventListener("scroll", updatePosition, true);
 }
 
 function removeListeners() {
   document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("keydown", onDocumentKeyDown);
+  document.removeEventListener("keydown", onDocumentKeyDown, true);
   window.removeEventListener("resize", updatePosition);
   window.removeEventListener("scroll", updatePosition, true);
 }

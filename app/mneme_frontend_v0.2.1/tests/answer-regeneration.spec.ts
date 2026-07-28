@@ -7,10 +7,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('restores an explicit mode and regenerates with run metadata on desktop and mobile', async ({ page }) => {
-  const modes = page.getByRole('radiogroup', { name: 'Answer mode' });
-  const memoryMode = modes.getByRole('radio', { name: 'Long-term memory' });
+  const modes = page.getByTestId('answer-mode-selector');
+  const memoryMode = modes.getByRole('button', { name: 'Long-term memory' });
   await memoryMode.click();
-  await expect(memoryMode).toHaveAttribute('aria-checked', 'true');
+  await expect(memoryMode).toHaveAttribute('aria-pressed', 'true');
 
   const existingAnswer = page.getByText('Start with the indexed documents').locator('..');
   await expect(existingAnswer.getByText(/Run run-preview-existing/)).toBeVisible();
@@ -21,5 +21,5 @@ test('restores an explicit mode and regenerates with run metadata on desktop and
   await expect(page.getByText(/Run run-preview-/).last()).toBeVisible();
   await expect(page.getByText('Long-term memory').last()).toBeVisible();
 
-  await expect(memoryMode).toHaveAttribute('aria-checked', 'true');
+  await expect(memoryMode).toHaveAttribute('aria-pressed', 'true');
 });

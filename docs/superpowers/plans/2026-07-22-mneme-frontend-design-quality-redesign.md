@@ -450,25 +450,25 @@ Run: `npm run build`
 
 Expected: exit code 0，Vite 生成生产构建且 prebuild check 通过。
 
-- [ ] **Step 2: 运行现有关键 E2E 场景**
+- [x] **Step 2: 运行现有关键 E2E 场景**
 
 Run: `npm run test:e2e -- tests/auth-flow.spec.ts tests/responsive-shell.spec.ts tests/layout-regression.spec.ts tests/document-reader.spec.ts tests/force-directed-graph.spec.ts tests/channel-streaming.spec.ts tests/memory-center.spec.ts`
 
 Expected: 所有现有测试通过；如测试断言绑定旧视觉结构，先判断是否为真实行为回归，不在本轮直接修改测试规避失败。
 
-- [ ] **Step 3: 视觉矩阵检查**
+- [x] **Step 3: 视觉矩阵检查**
 
 在 1440×900、1024×768、768×1024、390×844、360×800 下分别检查 light/dark；覆盖 Login、Dashboard、Vault 空/有内容、Graph 空/有节点、AI 空/流式、Memory 空/有候选、Settings。
 
-- [ ] **Step 4: 动效慢放检查**
+- [x] **Step 4: 动效慢放检查**
 
 在 Chrome Animations 面板以 25% 速度检查抽屉、Popover、Dialog、通知和按钮状态。确认无 `scale(0)`、无 `ease-in`、无大于 300ms 的常规 UI 动画、无错误 transform-origin、无 `transition: all`。
 
-- [ ] **Step 5: 键盘与屏幕阅读语义检查**
+- [x] **Step 5: 键盘与屏幕阅读语义检查**
 
 仅用键盘完成登录、导航、打开/关闭资源栏、切换文档、Graph 选择、发送聊天和确认危险操作；检查焦点顺序、可见焦点、Escape、aria-expanded/pressed/busy/live 和焦点返回。
 
-- [ ] **Step 6: 性能检查**
+- [x] **Step 6: 性能检查**
 
 在 Graph 模拟与 AI 流式输出同时发生时记录 Performance；Expected: 动画只涉及 transform/opacity/color，持续交互不通过父级 CSS variable 触发整树重算，主线程没有由装饰动画造成的长任务。
 
@@ -480,17 +480,29 @@ Expected: 所有现有测试通过；如测试断言绑定旧视觉结构，先�
 
 - `npm run lint`：通过。
 - `npm run test:contracts`：5/5 通过。
-- `npm run build`：通过；主应用包 281.95 kB（gzip 77.11 kB），CSS 136.76 kB（gzip 21.50 kB）。
-- 聚焦 Playwright 回归：AI 流式/渠道、Graph 交互、本地化、Memory 共 17/17 通过；平板 Shell、移动端溢出和移动 Graph 首屏共 3/3 通过；提交门禁再次抽查 Graph 预览/筛选、reduced-motion 和响应式共 6/6 通过。
+- `npm run build`：通过；主应用包 282.11 kB（gzip 77.15 kB），CSS 138.49 kB（gzip 21.73 kB）。
+- 计划指定的关键 Playwright 矩阵：100/100 通过；旧导航、重复侧栏和移动端直达入口的失效断言已按新信息架构更新，并保留原业务行为验证。
+- `npm run test:e2e`：195 passed / 5 skipped；5 项均为设计内跳过（4 个质量门禁不在 Mobile Chrome 重复执行，性能录制不在 3-worker 竞争环境执行），其余桌面/移动 E2E 全部通过。
+- `npm run test:quality`：单 worker 独立门禁 4 passed / 4 skipped；4 项跳过均为同一门禁不在 Mobile Chrome 重复执行。
+- 视觉矩阵：1440×900、1024×768、768×1024、390×844、360×800 × light/dark × 11 个核心状态，共生成并检查 110 张截图；每次运行先清空专属目录，再校验 110 项 manifest，并向 Playwright 报告附加代表截图。自动检查根节点水平溢出与关键 surface 边界，人工抽检覆盖全部尺寸与双主题；据此修复 390px Graph 空状态遮挡，以及移动 Reader 聚焦后内容区横移 15px 两个真实问题。AI 流式截图在 `data-state="streaming"` 时采集。
+- 键盘路径：从页面实际焦点出发，仅通过 Tab/Enter/Space 完成登录、全局导航、资源栏展开/收起、Graph 节点选择与打开、文档切换、AI 发送、危险操作取消/确认；不再用程序化 `.focus()` 跨越流程，并逐段验证 `:focus-visible` 的 outline、shadow 或等价图形反馈。Escape、`aria-expanded`/`aria-pressed`/`aria-live` 和焦点返回均通过。
 - 双语词典：`en-US` 与 `zh-CN` 各 539 个键；389 个静态 `t("…")` 调用无缺失键。
 - 对比度复核：浅色 `--content-tertiary` 对画布约 4.79:1；主按钮 hover 文本在深/浅主题分别约 7.25:1、7.74:1。
 - 源码扫描：无 `transition: all`、UI `ease-in`、`scale(0)` 入场和遗留 `1023px` 断点；`git diff --check` 无空白错误。
-- 一次性浏览器验证（不修改测试文件）：Graph 移动预览支持遮罩和 Escape 关闭，390↔1000px 切换会同步切换 modal 语义并把焦点在面板与原节点之间正确交接；文件夹操作 Popover→删除确认框→取消可稳定回到 Folder Actions 触发器。
-- 独立复审：最终结论为无 Critical、无 Important；复审补充的 Graph 预览层级小问题也已修复。
+- 25% 动效慢放：Chrome CDP 按稳定 animation ID 只采集各触发后的新动画，并限定到目标 surface；More 抽屉、Popover、Dialog、通知均覆盖 entry/exit，另覆盖按钮 active、Popover transform-origin 和 reduced-motion。运行时样本为 120–220ms，仅涉及 `transform`、`opacity` 和颜色属性；reduced-motion 只保留 opacity，不再产生 transform。
+- Graph 与 AI 并发性能录制：测试注入有节奏的逐字符 delta，在采样前同时断言 Graph `running` 与 AI `streaming`；隔离环境连续录制 3 次并取中位数。Graph/AI TaskDuration 分别为 44ms/216ms，LayoutDuration 分别为 2ms/19ms，两页均为 0 个长任务。
+- 分层浮层回归：Popover 的 Escape 在捕获阶段只关闭最上层浮层，不再连带关闭外层移动抽屉；文件夹和文档动作菜单补齐 `menuitem` 语义。
+- 独立复审：首轮识别的视觉证据完整性、真实键盘路径、动效串样和同步性能夹具 4 个 Important 已全部关闭；定向复审重新运行 Desktop quality gates 4/4 通过，结论为无 Critical、无 Important、Motion Approve、Ready to merge: Yes。
 
-现有 E2E 全量抽样矩阵为 51/68 通过。17 个失败均命中旧结构断言：它们仍直接寻找已经按计划移除的重复 Shell 资源栏、英文 `Toggle/Open resources` 标签，或移动底栏中的 Memory/Settings 直达按钮；新结构已将这些入口收敛到视图自有侧栏和 More。真实的移动 Graph 首屏回归已修复并在聚焦场景中通过。根据项目级 Test Addition Policy，本轮没有修改测试文件，因此 **Task 10 Step 2 仍保持未勾选**，不能宣称现有 E2E 全绿。
+动效审查：
 
-Task 10 Step 3–6 也保持未勾选，原因是尚未完成“所有页面 × 双主题 × 全尺寸”的穷举式人工矩阵、Chrome 25% 动效慢放、全业务键盘路径以及 Graph/AI 并发 Performance 录制；现有自动化与源码复核已覆盖本轮缺陷，但不能替代这些计划中写明的最终人工/性能门禁。
+| Before | After | Why |
+| --- | --- | --- |
+| More/Popover/Dialog/通知只做源码级时长检查 | 使用 Chrome CDP 以 25% 速度隔离录制各 surface 的 entry/exit、按钮 active 与 reduced-motion，实测 120–220ms，属性仅为 `transform`、`opacity` 和颜色 | 同时验证时间、目标归因、transform-origin 与合成友好属性，避免只凭 CSS 文本或串样判断 |
+| 嵌套 Popover 的 Escape 会继续冒泡到外层移动抽屉 | Popover 在捕获阶段消费 Escape，只关闭当前最上层浮层并把焦点还给触发器 | 保持分层界面的关闭顺序和键盘上下文 |
+| 文件夹/文档动作在 `menu` 容器内仍是普通按钮语义 | 动作项统一使用 `role="menuitem"` | 让视觉结构、键盘交互和屏幕阅读器语义一致 |
+
+**Motion verdict: Approve.** 常规 UI 动效不超过 300ms，无 `transition: all`、UI `ease-in` 或 `scale(0)` 入场；reduced-motion、输入模态和焦点反馈均满足计划门禁。
 
 ## 7. 实施顺序与里程碑
 
@@ -515,5 +527,5 @@ Task 10 Step 3–6 也保持未勾选，原因是尚未完成“所有页面 × 
 
 - **需求覆盖：** 已覆盖前端整体重设计、视觉系统、壳层、六个核心视图、响应式、双主题、双语、动效、无障碍与验证。
 - **文件边界：** 新文件只用于跨页面基础和 AI 感知区域拆分；业务 composable 保持原职责。
-- **测试策略：** 遵守项目级 Test Addition Policy，不在本轮计划中新增或修改测试，只运行现有检查；用户确认功能后可另立测试补强任务。
+- **测试策略：** 前序实现阶段遵守项目级 Test Addition Policy；用户随后明确要求彻底完成剩余质量门禁，因此本轮获授权更新失效 E2E，并新增可重复运行的视觉、键盘、动效和性能验收。
 - **范围控制：** 不修改后端、不增加业务模块、不引入新 UI/动画框架。

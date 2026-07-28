@@ -1,4 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openSettings(page: Page) {
+  const desktopSettings = page.getByTestId('activity-bar').getByRole('button', { name: '设置', exact: true });
+  if (await desktopSettings.isVisible()) {
+    await desktopSettings.click();
+    return;
+  }
+  await page.getByTestId('mobile-navigation').getByRole('button', { name: '打开更多导航' }).click();
+  await page.getByTestId('more-navigation-sheet').getByRole('button', { name: '设置', exact: true }).click();
+}
 
 const viewports = [
   { name: 'desktop', width: 1440, height: 900 },
@@ -16,7 +26,7 @@ for (const viewport of viewports) {
     if (viewport.width === 1440) {
       await page.getByRole('button', { name: '使用文档' }).click();
     }
-    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await openSettings(page);
     await expect(page.getByTestId('stitch-settings-layout')).toBeVisible();
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
@@ -35,13 +45,23 @@ for (const viewport of viewports) {
       expect(firstCard!.y).toBeGreaterThanOrEqual(bannerBox!.y + bannerBox!.height - 1);
     }
 
-    if (viewport.width >= 1024) {
+    if (viewport.width > 1024) {
       const main = page.locator('.mneme-shell__main');
       const expandedMain = await main.boundingBox();
-      await page.getByRole('button', { name: 'Toggle resources' }).click();
+      await page.getByRole('button', { name: '切换资源栏' }).click();
       await expect(page.getByTestId('resource-sidebar')).toBeHidden();
       const collapsedMain = await main.boundingBox();
       expect(collapsedMain!.width).toBeGreaterThan(expandedMain!.width);
+    } else if (viewport.width === 1024) {
+      const main = page.locator('.mneme-shell__main');
+      const closedMain = await main.boundingBox();
+      await expect(page.getByTestId('resource-sidebar')).toBeHidden();
+      await page.getByRole('button', { name: '切换资源栏' }).click();
+      await expect(page.getByTestId('resource-sidebar')).toBeVisible();
+      const openMain = await main.boundingBox();
+      expect(openMain!.width).toBeCloseTo(closedMain!.width, 0);
+      await page.getByRole('button', { name: '关闭资源栏' }).click();
+      await expect(page.getByTestId('resource-sidebar')).toBeHidden();
     }
 
     await page.screenshot({ path: testInfo.outputPath(`settings-${viewport.name}.png`), fullPage: true });
