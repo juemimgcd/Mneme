@@ -39,23 +39,30 @@ test("folder rename, nesting, and non-empty delete keep actionable feedback", as
     if (name === "Research") await page.getByRole("button", { name: "Vault root", exact: true }).click();
   }
   await page.getByTestId("folder-Research").getByRole("button", { name: "Research", exact: true }).click();
-  await page.getByRole("button", { name: "Rename folder" }).click();
+  await page.getByRole("button", { name: "Folder actions" }).click();
+  await page.getByRole("menuitem", { name: "Rename folder" }).click();
   await page.getByLabel("Folder name").fill("Research notes");
   await page.locator(".folder-form").getByRole("button", { name: "Rename folder" }).click();
   await expect(page.getByTestId("folder-Research notes")).toBeVisible();
 
-  await page.getByRole("button", { name: "Move folder" }).click();
-  await page.getByRole("option", { name: "Archive", exact: true }).click();
+  await page.getByRole("button", { name: "Folder actions" }).click();
+  await page.getByRole("menuitem", { name: "Move folder" }).click();
+  await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
   await expect(page.getByTestId("folder-Archive")).toContainText("Research notes");
 
   await page.getByRole("button", { name: /move zettelkasten-principles/i }).click();
   await page.getByRole("option", { name: "Research notes", exact: true }).click();
   await page.getByTestId("folder-Research notes").getByRole("button", { name: "Research notes", exact: true }).click();
-  await page.getByRole("button", { name: "Delete folder" }).click();
+  await page.getByRole("button", { name: "Folder actions" }).click();
+  await page.getByRole("menuitem", { name: "Delete folder" }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "Delete this folder?" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "Delete folder" }).click();
   await expect(page.getByRole("alert")).toContainText(/empty|contains/i);
   await expect(page.getByTestId("folder-Research notes")).toBeVisible();
-  await page.getByRole("button", { name: "Move folder" }).click();
-  await page.getByRole("option", { name: "Vault root", exact: true }).click();
+  await page.getByRole("button", { name: "Folder actions" }).click();
+  await page.getByRole("menuitem", { name: "Move folder" }).click();
+  await page.getByRole("menuitem", { name: "Vault root", exact: true }).click();
   await expect(page.getByTestId("document-tree").getByTestId("folder-Research notes")).toBeVisible();
 });
 
@@ -214,7 +221,13 @@ test("Chinese locale covers reader tree, properties, and actions", async ({ page
     api.documentRawBlob = async () => { throw new Error("404 missing"); };
   });
   await page.getByRole("button", { name: "zettelkasten-principles.md", exact: true }).click();
-  await expect(page.getByRole("button", { name: "下载", exact: true })).toBeVisible();
+  const desktopDownload = page.getByRole("button", { name: "下载", exact: true });
+  if (!(await desktopDownload.isVisible())) {
+    await page.getByRole("button", { name: "文档操作" }).click();
+    await expect(page.getByRole("menuitem", { name: "下载", exact: true })).toBeVisible();
+  } else {
+    await expect(desktopDownload).toBeVisible();
+  }
   await expect(page.getByText("阅读器暂不支持显示此文件。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "下载原文件" })).toBeVisible();
   if (!(await page.getByRole("heading", { name: "属性", exact: true }).isVisible())) {
@@ -242,18 +255,18 @@ test("mobile drawers and upload are keyboard operable with focus restoration", a
   await expect(upload).toBeFocused();
   await expect(page.getByRole("treeitem", { name: /Vault root/i })).toBeVisible();
   await expect(filesTrigger).toHaveAttribute("aria-controls", "document-tree-pane");
-  await page.keyboard.press("Escape");
+  const documentButton = page.getByRole("button", { name: "zettelkasten-principles.md", exact: true });
+  await documentButton.focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("document-tree-pane")).toBeHidden();
-  await expect(filesTrigger).toBeFocused();
-  await propertiesTrigger.click();
+  await expect(page.getByTestId("document-reader")).toBeFocused();
+  await propertiesTrigger.focus();
+  await page.keyboard.press("Enter");
   await expect(propertiesTrigger).toHaveAttribute("aria-controls", "document-properties-pane");
   await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("#document-properties-pane")))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("document-properties")).toBeHidden();
   await expect(propertiesTrigger).toBeFocused();
-  await filesTrigger.click();
-  await page.getByRole("button", { name: "zettelkasten-principles.md", exact: true }).click();
-  await expect(page.getByTestId("document-reader")).toBeFocused();
   await expect(page.getByLabel("Upload document")).toHaveCount(1);
 });
 

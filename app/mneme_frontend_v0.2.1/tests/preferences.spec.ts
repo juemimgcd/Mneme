@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { openView } from './helpers/navigation';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?preview=1');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.getByRole('button', { name: 'System Settings' }).click();
+  await openView(page, 'System Settings');
 });
 
 test('theme preference persists across reloads', async ({ page }) => {

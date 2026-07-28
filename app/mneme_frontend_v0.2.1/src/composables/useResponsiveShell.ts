@@ -1,7 +1,7 @@
 import { onBeforeUnmount, ref } from "vue";
 
 const mobileQuery = window.matchMedia("(max-width: 767px)");
-const tabletQuery = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+const tabletQuery = window.matchMedia("(min-width: 768px) and (max-width: 1024px)");
 
 export function useResponsiveShell() {
   type ShellMode = "desktop" | "tablet" | "mobile";

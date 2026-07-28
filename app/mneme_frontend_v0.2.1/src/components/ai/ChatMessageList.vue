@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Bot, ChevronDown, MessageSquare, RefreshCw } from "@lucide/vue";
 import type { AnswerMode, ChatMessageData } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 import UiButton from "../ui/UiButton.vue";
 import UiEmptyState from "../ui/UiEmptyState.vue";
 
@@ -15,10 +16,11 @@ defineProps<{
 defineEmits<{
   regenerate: [messageId: string, mode: AnswerMode];
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
-  <section class="message-list" aria-label="Conversation">
+  <section class="message-list" :aria-label="t('ai.conversation')">
     <template v-if="messages.length">
       <article
         v-for="(message, index) in messages"
@@ -31,7 +33,7 @@ defineEmits<{
         </div>
         <div class="message__body">
           <header class="message__header">
-            <span>{{ message.role === "user" ? "You" : "Mneme" }}</span>
+            <span>{{ message.role === "user" ? t("ai.you") : "Mneme" }}</span>
             <time :datetime="message.created_at">{{ formatDate(message.created_at) }}</time>
             <span v-if="message.route" data-testid="answer-mode-badge" class="message__mode">
               {{ modeLabel(message.route.query_type) }}
@@ -41,10 +43,10 @@ defineEmits<{
           <p class="message__content">{{ message.content }}</p>
 
           <div v-if="message.role === 'assistant'" class="message__meta">
-            <span v-if="message.agent_run_id">Run {{ message.agent_run_id }}</span>
-            <span v-if="message.confidence !== null">Confidence {{ Math.round(message.confidence * 100) }}%</span>
-            <span v-if="message.insufficient_evidence">Insufficient evidence</span>
-            <span v-if="message.uncertainty">Uncertainty: {{ message.uncertainty }}</span>
+            <span v-if="message.agent_run_id">{{ t("ai.runId", { id: message.agent_run_id }) }}</span>
+            <span v-if="message.confidence !== null">{{ t("ai.confidence", { value: Math.round(message.confidence * 100) }) }}</span>
+            <span v-if="message.insufficient_evidence">{{ t("ai.insufficientEvidence") }}</span>
+            <span v-if="message.uncertainty">{{ t("ai.uncertainty", { value: message.uncertainty }) }}</span>
             <UiButton
               v-if="messages[index - 1]?.id"
               variant="ghost"
@@ -53,21 +55,21 @@ defineEmits<{
               @click="$emit('regenerate', messages[index - 1].id, answerMode)"
             >
               <template #icon><RefreshCw /></template>
-              Regenerate in selected mode
+              {{ t("ai.regenerate") }}
             </UiButton>
           </div>
 
           <details v-if="message.sources.length" class="message__sources">
             <summary>
               <ChevronDown aria-hidden="true" />
-              {{ message.sources.length }} {{ message.sources.length === 1 ? "source" : "sources" }}
+              {{ t("ai.sourceCount", { count: message.sources.length }) }}
             </summary>
             <ul>
               <li
                 v-for="source in message.sources"
                 :key="source.evidence_id || source.source_id || source.document_id || source.chunk_id"
               >
-                <span>{{ source.source_type || "source" }}</span>
+                <span>{{ source.source_type || t("ai.source") }}</span>
                 <strong>{{ source.document_id || source.source_id || source.evidence_id }}</strong>
                 <time v-if="source.source_time" :datetime="source.source_time">{{ formatDate(source.source_time) }}</time>
               </li>
@@ -78,8 +80,8 @@ defineEmits<{
     </template>
     <UiEmptyState
       v-else
-      title="Start a conversation"
-      description="Choose an answer mode, then ask a question."
+      :title="t('ai.emptyTitle')"
+      :description="t('ai.emptyDescription')"
     >
       <template #icon><Bot /></template>
     </UiEmptyState>

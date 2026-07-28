@@ -29,7 +29,7 @@
     height: 100vh;
     min-width: 0;
     flex-direction: column;
-    overflow: hidden;
+    overflow: clip;
   }
 
   .glass-panel,
@@ -196,7 +196,7 @@
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .mneme-shell,
   .mneme-shell--resource-closed {
     display: grid;
@@ -231,7 +231,7 @@
   }
 
   .mneme-shell__main {
-    height: calc(100dvh - 3.7rem);
+    height: calc(100dvh - 3.7rem - env(safe-area-inset-bottom));
   }
 
   .mneme-workbench [data-testid="obsidian-editor-pane"] {

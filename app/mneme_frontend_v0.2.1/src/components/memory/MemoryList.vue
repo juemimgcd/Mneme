@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronRight } from "@lucide/vue";
 import type { CanonicalMemory } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 
 defineProps<{
   items: CanonicalMemory[];
@@ -8,10 +9,11 @@ defineProps<{
   pending: boolean;
 }>();
 defineEmits<{ select: [memory: CanonicalMemory] }>();
+const { t } = useI18n();
 </script>
 
 <template>
-  <div class="memory-list" aria-label="Active memories">
+  <div class="memory-list" :aria-label="t('memory.activeMemories')">
     <button
       v-for="item in items"
       :key="item.memory_id"

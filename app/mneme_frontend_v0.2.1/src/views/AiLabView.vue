@@ -6,6 +6,7 @@ import ChatComposer from "../components/ai/ChatComposer.vue";
 import ChatHistory from "../components/ai/ChatHistory.vue";
 import ChatMessageList from "../components/ai/ChatMessageList.vue";
 import UiButton from "../components/ui/UiButton.vue";
+import { useI18n } from "../composables/useI18n";
 import type { MnemeWorkspace } from "../composables/useMnemeWorkspace";
 import type { AnswerMode } from "../types";
 
@@ -13,18 +14,21 @@ const props = defineProps<{
   workspace: MnemeWorkspace;
   formatDate: (value: string | number | Date) => string;
 }>();
+const { t } = useI18n();
 
-const modes = [
-  { value: "kb_qa", label: "Knowledge base" },
-  { value: "memory_query", label: "Long-term memory" },
-  { value: "profile_query", label: "Profile" },
-  { value: "analysis_query", label: "Analysis" },
-  { value: "general_chat", label: "General chat" },
-] as const satisfies readonly { value: AnswerMode; label: string }[];
+const modes = computed<readonly { value: AnswerMode; label: string }[]>(() => [
+  { value: "kb_qa", label: t("ai.mode.knowledgeBase") },
+  { value: "memory_query", label: t("ai.mode.memory") },
+  { value: "profile_query", label: t("ai.mode.profile") },
+  { value: "analysis_query", label: t("ai.mode.analysis") },
+  { value: "general_chat", label: t("ai.mode.general") },
+]);
 
-const compactMedia = window.matchMedia("(max-width: 1023px)");
+const compactMedia = window.matchMedia("(max-width: 1024px)");
+const isCompact = ref(compactMedia.matches);
 const historyCollapsed = ref(compactMedia.matches);
 const onCompactChange = (event: MediaQueryListEvent) => {
+  isCompact.value = event.matches;
   historyCollapsed.value = event.matches;
 };
 compactMedia.addEventListener("change", onCompactChange);
@@ -33,16 +37,16 @@ onBeforeUnmount(() => compactMedia.removeEventListener("change", onCompactChange
 const currentTitle = computed(() =>
   props.workspace.chatSessions.value.find(
     (session) => session.id === props.workspace.activeChatSessionId.value,
-  )?.title || "New chat",
+  )?.title || t("ai.newChat"),
 );
 const modeLabel = (value?: string) =>
-  modes.find((mode) => mode.value === value)?.label ?? "Assistant";
+  modes.value.find((mode) => mode.value === value)?.label ?? t("ai.assistant");
 const modeDescription = computed(() => ({
-  kb_qa: "Answer from indexed documents in the active knowledge base.",
-  memory_query: "Answer from stored memory evidence for the active workspace.",
-  profile_query: "Summarize the profile evidence associated with this workspace.",
-  analysis_query: "Analyze growth signals and evidence-backed patterns.",
-  general_chat: "Use a general conversation without private retrieval.",
+  kb_qa: t("ai.modeDescription.knowledgeBase"),
+  memory_query: t("ai.modeDescription.memory"),
+  profile_query: t("ai.modeDescription.profile"),
+  analysis_query: t("ai.modeDescription.analysis"),
+  general_chat: t("ai.modeDescription.general"),
 }[props.workspace.chatAnswerMode.value]));
 
 async function selectSession(sessionId: string) {
@@ -68,19 +72,24 @@ async function createSession() {
       :sessions="workspace.filteredChatSessions.value"
       :active-session-id="workspace.activeChatSessionId.value"
       :collapsed="historyCollapsed"
+      :modal="isCompact"
       :format-date="formatDate"
       @close="historyCollapsed = true"
       @create="createSession"
       @select="selectSession"
     />
 
-    <section data-testid="chat-function-grid" class="chat-workspace">
+    <section
+      data-testid="chat-function-grid"
+      class="chat-workspace"
+      :inert="isCompact && !historyCollapsed ? true : undefined"
+    >
       <UiButton
         data-testid="ai-history-rail-toggle"
         class="chat-workspace__rail-toggle"
         variant="secondary"
         size="sm"
-        :title="historyCollapsed ? 'Expand chat history' : 'Collapse chat history'"
+        :title="historyCollapsed ? t('ai.expandHistory') : t('ai.collapseHistory')"
         :aria-expanded="!historyCollapsed"
         @click="historyCollapsed = !historyCollapsed"
       >
@@ -92,18 +101,18 @@ async function createSession() {
 
       <header class="chat-workspace__header">
         <div>
-          <small>AI Laboratory</small>
+          <small>{{ t("nav.ai") }}</small>
           <h1>{{ currentTitle }}</h1>
         </div>
         <UiButton
           variant="danger"
           size="sm"
-          aria-label="Delete active chat"
+          :aria-label="t('ai.delete')"
           :disabled="!workspace.activeChatSessionId.value || workspace.chatPending.value"
           @click="workspace.deleteActiveChatSession"
         >
           <template #icon><Trash2 /></template>
-          Delete
+          {{ t("ai.deleteShort") }}
         </UiButton>
       </header>
 
@@ -203,7 +212,7 @@ async function createSession() {
   padding: var(--space-3) var(--space-5);
   overscroll-behavior: contain;
 }
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .ai-layout,
   .ai-layout--collapsed {
     grid-template-columns: minmax(0, 1fr);

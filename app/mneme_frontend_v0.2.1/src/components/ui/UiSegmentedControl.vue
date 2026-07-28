@@ -63,7 +63,6 @@ async function moveSelection(event: KeyboardEvent, currentIndex: number) {
       class="ui-segmented__option"
       :class="{ 'ui-segmented__option--active': model === option.value }"
       :aria-label="option.ariaLabel"
-      :aria-checked="model === option.value"
       :aria-pressed="model === option.value"
       :tabindex="tabIndexFor(option, index)"
       :disabled="disabled || option.disabled"

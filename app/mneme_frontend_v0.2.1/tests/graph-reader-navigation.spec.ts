@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/?preview=1', { waitUntil: 'domcontentloaded' });
 });
 
-test('graph focus keeps one-hop neighbors visible and canvas clears focus', async ({ page }) => {
+test('graph focus keeps one-hop neighbors visible and the active surface clears focus', async ({ page }) => {
   const selected = page.locator('[data-node-id="node-doc-zettel"]');
   await selected.click();
 
@@ -13,9 +13,18 @@ test('graph focus keeps one-hop neighbors visible and canvas clears focus', asyn
   await expect(page.locator('[data-node-id="node-memory-atomic"]')).toHaveAttribute('data-focus-state', 'neighbor');
   await expect(page.locator('[data-node-id="node-doc-graph"]')).toHaveAttribute('data-focus-state', 'dimmed');
 
-  const canvas = page.locator('svg[aria-label="Knowledge graph"]');
-  const box = await canvas.boundingBox();
-  await page.mouse.click(box!.x + box!.width - 20, box!.y + box!.height - 20);
+  const preview = page.getByTestId('graph-document-preview-panel');
+  if ((page.viewportSize()?.width ?? 0) <= 900) {
+    await expect(preview).toBeVisible();
+    await preview.getByRole('button', { name: 'Close graph preview' }).click();
+    await expect(preview).toBeHidden();
+    await expect(selected).toBeFocused();
+    await page.getByPlaceholder('Search knowledge base...').focus();
+  } else {
+    const canvas = page.locator('svg[aria-label="Knowledge graph"]');
+    const box = await canvas.boundingBox();
+    await page.mouse.click(box!.x + box!.width - 20, box!.y + box!.height - 20);
+  }
   await expect(selected).toHaveAttribute('data-focus-state', 'normal');
 });
 
@@ -56,6 +65,9 @@ test('late preview responses cannot overwrite the newer graph selection', async 
   });
   await page.locator('[data-node-id="node-doc-zettel"]').click();
   await page.waitForTimeout(280);
+  if (await page.getByTestId('graph-document-preview-panel').getByRole('button', { name: 'Close graph preview' }).isVisible()) {
+    await page.getByTestId('graph-document-preview-panel').getByRole('button', { name: 'Close graph preview' }).click();
+  }
   await page.locator('[data-node-id="node-doc-graph"]').click();
   await expect(page.getByTestId('graph-document-preview-panel')).toContainText('memory-graph-design.pdf');
   await page.waitForTimeout(700);
@@ -83,6 +95,10 @@ test('Enter opens while Space only selects the graph document', async ({ page })
   await expect(node).toHaveAttribute('data-focus-state', 'selected');
   await expect(page.getByTestId('document-reader-title')).toHaveCount(0);
 
+  if (await page.getByTestId('graph-document-preview-panel').isVisible()) {
+    await page.keyboard.press('Escape');
+    await expect(node).toBeFocused();
+  }
   await node.press('Enter');
   await expect(page.getByTestId('document-reader-title')).toContainText('zettelkasten-principles.md');
 });

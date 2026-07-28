@@ -2,6 +2,7 @@
 import { ArrowLeft, Ban, Save, ShieldAlert, Trash2 } from "@lucide/vue";
 import { ref, watch } from "vue";
 import type { MemoryDetail } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 import UiButton from "../ui/UiButton.vue";
 import UiDialog from "../ui/UiDialog.vue";
 import UiStatusPanel from "../ui/UiStatusPanel.vue";
@@ -23,6 +24,7 @@ const emit = defineEmits<{
   remove: [];
   purgeSource: [id: string];
 }>();
+const { formatDate, t } = useI18n();
 
 const value = ref(props.detail.memory.value);
 const invalidateOpen = ref(false);
@@ -54,7 +56,7 @@ function confirmSourcePurge() {
       <div>
         <UiButton v-if="showBack" variant="ghost" size="sm" @click="emit('back')">
           <template #icon><ArrowLeft /></template>
-          All memories
+          {{ t("memory.allMemories") }}
         </UiButton>
         <small>{{ detail.memory.memory_type }} · {{ detail.memory.status }}</small>
         <h2>{{ detail.memory.subject }} {{ detail.memory.predicate }}</h2>
@@ -64,10 +66,10 @@ function confirmSourcePurge() {
 
     <section class="memory-detail__editor">
       <div>
-        <h3>Memory value</h3>
-        <small>Editing creates a new audited revision.</small>
+        <h3>{{ t("memory.value") }}</h3>
+        <small>{{ t("memory.editingRevision") }}</small>
       </div>
-      <textarea v-model="value" aria-label="Memory value" />
+      <textarea v-model="value" :aria-label="t('memory.value')" />
       <UiStatusPanel
         v-if="saveState === 'success' || saveState === 'error'"
         :title="saveMessage"
@@ -81,27 +83,27 @@ function confirmSourcePurge() {
           @click="emit('revise', value)"
         >
           <template #icon><Save /></template>
-          Save revision
+          {{ t("memory.saveRevision") }}
         </UiButton>
         <UiButton variant="secondary" :disabled="pending" @click="invalidateOpen = true">
           <template #icon><Ban /></template>
-          Invalidate
+          {{ t("memory.invalidate") }}
         </UiButton>
         <UiButton variant="danger" :disabled="pending" @click="removeOpen = true">
           <template #icon><Trash2 /></template>
-          Hard delete
+          {{ t("memory.hardDelete") }}
         </UiButton>
       </div>
     </section>
 
     <section class="memory-detail__section">
-      <h3>Revision history</h3>
+      <h3>{{ t("memory.revisionHistory") }}</h3>
       <ol class="revision-list">
         <li v-for="revision in detail.revisions" :key="revision.revision_id">
           <strong>{{ revision.value }}</strong>
           <small>
-            {{ new Date(revision.valid_from).toLocaleString() }}
-            <template v-if="revision.valid_to"> – {{ new Date(revision.valid_to).toLocaleString() }}</template>
+            {{ formatDate(revision.valid_from) }}
+            <template v-if="revision.valid_to"> – {{ formatDate(revision.valid_to) }}</template>
             · {{ revision.reason }}
           </small>
         </li>
@@ -109,10 +111,10 @@ function confirmSourcePurge() {
     </section>
 
     <section class="memory-detail__section">
-      <h3>Evidence</h3>
+      <h3>{{ t("memory.evidence") }}</h3>
       <ul class="evidence-list">
         <li v-for="evidence in detail.evidence" :key="evidence.evidence_id">
-          <small>{{ evidence.source_type }} · {{ new Date(evidence.source_time).toLocaleString() }}</small>
+          <small>{{ evidence.source_type }} · {{ formatDate(evidence.source_time) }}</small>
           <p>{{ evidence.excerpt }}</p>
           <UiButton
             variant="danger"
@@ -121,7 +123,7 @@ function confirmSourcePurge() {
             @click="requestSourcePurge(evidence.source_document_id || evidence.source_id)"
           >
             <template #icon><ShieldAlert /></template>
-            Clear this source
+            {{ t("memory.clearSource") }}
           </UiButton>
         </li>
       </ul>
@@ -130,27 +132,27 @@ function confirmSourcePurge() {
 
   <UiDialog
     v-model="invalidateOpen"
-    title="Invalidate this memory?"
-    description="The memory will stop influencing future answers, while its revision and evidence history remain available for audit."
-    confirm-label="Invalidate memory"
+    :title="t('memory.invalidateTitle')"
+    :description="t('memory.invalidateDescription')"
+    :confirm-label="t('memory.invalidateMemory')"
     confirm-variant="secondary"
     :busy="pending"
     @confirm="emit('invalidate')"
   />
   <UiDialog
     v-model="removeOpen"
-    title="Hard delete this memory?"
-    description="This permanently removes the memory and every revision. This action cannot be undone."
-    confirm-label="Hard delete"
+    :title="t('memory.hardDeleteTitle')"
+    :description="t('memory.hardDeleteDescription')"
+    :confirm-label="t('memory.hardDelete')"
     confirm-variant="danger"
     :busy="pending"
     @confirm="emit('remove')"
   />
   <UiDialog
     v-model="purgeSourceOpen"
-    title="Clear memories from this source?"
-    description="All governed memories backed by this owned source will be permanently removed. This action cannot be undone."
-    confirm-label="Clear source"
+    :title="t('memory.clearSourceTitle')"
+    :description="t('memory.clearSourceDescription')"
+    :confirm-label="t('memory.clearSource')"
     confirm-variant="danger"
     :busy="pending"
     @confirm="confirmSourcePurge"

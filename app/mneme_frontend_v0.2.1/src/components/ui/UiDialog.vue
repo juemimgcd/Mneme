@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
+import { useI18n } from "../../composables/useI18n";
 import UiButton, { type UiButtonVariant } from "./UiButton.vue";
 
 const props = withDefaults(defineProps<{
@@ -13,8 +14,8 @@ const props = withDefaults(defineProps<{
   initialFocus?: "cancel" | "confirm" | "dialog";
 }>(), {
   description: "",
-  confirmLabel: "Confirm",
-  cancelLabel: "Cancel",
+  confirmLabel: "",
+  cancelLabel: "",
   confirmVariant: "primary",
   busy: false,
   dismissible: true,
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<{
 
 const open = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
+const { t } = useI18n();
 const titleId = useId();
 const descriptionId = useId();
 const dialog = ref<HTMLElement | null>(null);
@@ -116,8 +118,8 @@ onBeforeUnmount(() => {
           <div v-if="$slots.default" class="ui-dialog__content"><slot /></div>
           <footer>
             <slot name="actions" :cancel="cancel">
-              <UiButton data-dialog-cancel variant="secondary" :disabled="busy" @click="cancel">{{ cancelLabel }}</UiButton>
-              <UiButton data-dialog-confirm :variant="confirmVariant" :loading="busy" @click="emit('confirm')">{{ confirmLabel }}</UiButton>
+              <UiButton data-dialog-cancel variant="secondary" :disabled="busy" @click="cancel">{{ cancelLabel || t("common.cancel") }}</UiButton>
+              <UiButton data-dialog-confirm :variant="confirmVariant" :loading="busy" @click="emit('confirm')">{{ confirmLabel || t("common.confirm") }}</UiButton>
             </slot>
           </footer>
         </section>

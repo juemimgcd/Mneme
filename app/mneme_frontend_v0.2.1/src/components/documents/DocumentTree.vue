@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { FileText, FolderInput, FolderOpen, MoreHorizontal, Pencil, Plus, Trash2, Upload } from "@lucide/vue";
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import type { DocumentFolderData, DocumentListItem } from "../../types";
 import DocumentTreeNode from "./DocumentTreeNode.vue";
 import { useI18n } from "../../composables/useI18n";
 import UiIconButton from "../ui/UiIconButton.vue";
 import UiPopover from "../ui/UiPopover.vue";
+import UiDialog from "../ui/UiDialog.vue";
 
 const { t } = useI18n();
 
@@ -32,6 +33,8 @@ const renaming = ref(false);
 const movingFolder = ref(false);
 const folderName = ref("");
 const movingRootDocumentId = ref("");
+const deleteFolderOpen = ref(false);
+const pendingDeleteFolder = ref<DocumentFolderData | null>(null);
 
 const flatFolders = computed(() => {
   const byId = new Map<string, DocumentFolderData>();
@@ -111,6 +114,20 @@ function dropOnRoot(event: DragEvent) {
 function triggerUpload() {
   document.getElementById("workspace-upload")?.click();
 }
+
+async function requestFolderDelete(folder: DocumentFolderData, closePopover: () => void) {
+  pendingDeleteFolder.value = folder;
+  closePopover();
+  await nextTick();
+  deleteFolderOpen.value = true;
+}
+
+function confirmFolderDelete() {
+  if (!pendingDeleteFolder.value) return;
+  emit("deleteFolder", pendingDeleteFolder.value.id);
+  deleteFolderOpen.value = false;
+  pendingDeleteFolder.value = null;
+}
 </script>
 
 <template>
@@ -128,9 +145,9 @@ function triggerUpload() {
         <template #default="{ close }">
           <div v-if="selectedFolder" class="folder-action-menu">
             <template v-if="!movingFolder">
-              <button type="button" @click="renaming = true; creating = false; folderName = selectedFolder.name; close()"><Pencil />{{ t("reader.renameFolder") }}</button>
-              <button type="button" @click="movingFolder = true"><FolderInput />{{ t("reader.moveFolder") }}</button>
-              <button type="button" class="danger" @click="emit('deleteFolder', selectedFolder.id); close()"><Trash2 />{{ t("reader.deleteFolder") }}</button>
+              <button type="button" role="menuitem" @click="renaming = true; creating = false; folderName = selectedFolder.name; close()"><Pencil />{{ t("reader.renameFolder") }}</button>
+              <button type="button" role="menuitem" @click="movingFolder = true"><FolderInput />{{ t("reader.moveFolder") }}</button>
+              <button type="button" role="menuitem" class="danger" @click="requestFolderDelete(selectedFolder, close)"><Trash2 />{{ t("reader.deleteFolder") }}</button>
             </template>
             <template v-else>
               <span>{{ t("reader.moveFolder") }}</span>
@@ -138,6 +155,7 @@ function triggerUpload() {
                 v-for="target in flatFolders.filter((item) => item.id !== selectedFolder?.id)"
                 :key="target.id"
                 type="button"
+                role="menuitem"
                 @click="requestFolderMove(selectedFolder.id, target.id); movingFolder = false; close()"
               >{{ target.is_root ? t("reader.vaultRoot") : target.name }}</button>
             </template>
@@ -201,6 +219,15 @@ function triggerUpload() {
       <p v-if="!latestDocuments.length" class="tree-empty">{{ t("reader.noDocuments") }}</p>
     </nav>
   </aside>
+  <UiDialog
+    v-model="deleteFolderOpen"
+    :title="t('reader.deleteFolderTitle')"
+    :description="t('reader.deleteFolderDescription', { name: pendingDeleteFolder?.name ?? '' })"
+    :confirm-label="t('reader.deleteFolder')"
+    :cancel-label="t('reader.cancel')"
+    confirm-variant="danger"
+    @confirm="confirmFolderDelete"
+  />
 </template>
 
 <style scoped>

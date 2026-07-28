@@ -2,12 +2,14 @@
 import { AlertTriangle, CheckCircle2, Circle, LoaderCircle } from "@lucide/vue";
 import { computed } from "vue";
 import type { AgentRunTraceItem, AgentStreamConnectionState } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 
 const props = defineProps<{
   items: AgentRunTraceItem[];
   progress: string;
   streamState: AgentStreamConnectionState;
 }>();
+const { t } = useI18n();
 
 const currentIndex = computed(() => {
   let active = -1;
@@ -21,6 +23,7 @@ const currentIndex = computed(() => {
 });
 const currentItem = computed(() => props.items[currentIndex.value]);
 const completedCount = computed(() => props.items.filter((item) => item.state === "complete").length);
+const streamStateLabel = computed(() => t(`ai.streamState.${props.streamState}`));
 const iconFor = (state: AgentRunTraceItem["state"]) =>
   state === "complete" ? CheckCircle2 : state === "warning" ? AlertTriangle : LoaderCircle;
 </script>
@@ -31,11 +34,11 @@ const iconFor = (state: AgentRunTraceItem["state"]) =>
       <div class="run-trace__heading">
         <component :is="currentItem ? iconFor(currentItem.state) : Circle" aria-hidden="true" />
         <div>
-          <strong>{{ currentItem?.label || progress || "Preparing run" }}</strong>
-          <small>{{ completedCount }} of {{ items.length }} steps complete</small>
+          <strong>{{ currentItem?.label || progress || t("ai.preparingRun") }}</strong>
+          <small>{{ t("ai.stepsComplete", { complete: completedCount, total: items.length }) }}</small>
         </div>
       </div>
-      <span :data-state="streamState">{{ streamState }}</span>
+      <span :data-state="streamState">{{ streamStateLabel }}</span>
     </header>
 
     <div class="run-trace__meter" aria-hidden="true">
@@ -43,7 +46,7 @@ const iconFor = (state: AgentRunTraceItem["state"]) =>
     </div>
 
     <details v-if="items.length > 1">
-      <summary>Show run history</summary>
+      <summary>{{ t("ai.showRunHistory") }}</summary>
       <ol>
         <li v-for="item in items" :key="item.id" :data-state="item.state">
           <component :is="iconFor(item.state)" aria-hidden="true" />

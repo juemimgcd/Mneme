@@ -1,18 +1,22 @@
 import { expect, test } from "@playwright/test";
+import { openView } from "./helpers/navigation";
 
-async function revealRecentFiles(page: import("@playwright/test").Page) {
-  const recentFiles = page.getByTestId("sidebar-group-files");
-  if (!(await recentFiles.isVisible())) {
-    await page.getByRole("button", { name: "Open resources" }).click();
+async function revealDocumentTree(page: import("@playwright/test").Page) {
+  if (!(await page.getByTestId("document-workspace").isVisible())) {
+    await openView(page, "Research Vault");
   }
-  await expect(recentFiles).toBeVisible();
-  return recentFiles;
+  const pane = page.getByTestId("document-tree-pane");
+  if (!(await pane.isVisible())) {
+    await page.getByRole("button", { name: "Files", exact: true }).click();
+  }
+  await expect(pane).toBeVisible();
+  return page.getByTestId("document-tree");
 }
 
 test("opening a recent file reaches the unified reader", async ({ page }) => {
   await page.goto("/?preview=1", { waitUntil: "domcontentloaded" });
-  await (await revealRecentFiles(page))
-    .getByRole("button", { name: /zettelkasten/i })
+  await (await revealDocumentTree(page))
+    .getByRole("button", { name: "zettelkasten-principles.md", exact: true })
     .click();
   await expect(page.getByTestId("document-reader")).toBeVisible();
   await expect(page.getByTestId("document-reader-title")).toContainText(
@@ -51,8 +55,8 @@ test("legacy document previews publish only the latest request and clear invalid
 
 test("duplicate upload exposes the canonical open action", async ({ page }) => {
   await page.goto("/?preview=1", { waitUntil: "domcontentloaded" });
-  const recentFiles = page.getByTestId("sidebar-group-files").getByRole("button");
-  const initialFileCount = await recentFiles.count();
+  const documentTree = await revealDocumentTree(page);
+  await expect(documentTree.getByRole("button", { name: "zettelkasten-principles.md", exact: true })).toHaveCount(1);
   await page.getByLabel("Upload document").setInputFiles({
     name: "copy.md",
     mimeType: "text/markdown",
@@ -61,7 +65,7 @@ test("duplicate upload exposes the canonical open action", async ({ page }) => {
   await expect(page.getByTestId("duplicate-upload-notice")).toContainText(
     "already exists",
   );
-  await expect(recentFiles).toHaveCount(initialFileCount);
+  await expect(documentTree.getByRole("button", { name: "copy.md", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Open existing file" }).click();
   await expect(page.getByTestId("document-reader-title")).toContainText(
     "zettelkasten-principles.md",
@@ -70,15 +74,16 @@ test("duplicate upload exposes the canonical open action", async ({ page }) => {
 
 test("a created upload invalidates the notes list and opens its canonical document", async ({ page }) => {
   await page.goto("/?preview=1", { waitUntil: "domcontentloaded" });
+  await revealDocumentTree(page);
   await page.getByLabel("Upload document").setInputFiles({
     name: "workspace-state.md",
     mimeType: "text/markdown",
     buffer: Buffer.from("# Workspace state\n\nA changed document version."),
   });
   await expect(page.getByTestId("document-reader-title")).toContainText("workspace-state.md");
-  const recentFiles = await revealRecentFiles(page);
+  const recentFiles = await revealDocumentTree(page);
   await expect(
-    recentFiles.getByRole("button", { name: /workspace-state/i }),
+    recentFiles.getByRole("button", { name: "workspace-state.md", exact: true }),
   ).toBeVisible();
 });
 

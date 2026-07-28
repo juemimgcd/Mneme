@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openView } from './helpers/navigation';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?preview=1', { waitUntil: 'domcontentloaded' });
@@ -7,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('Chinese locale updates navigation and graph tools without losing the active workspace', async ({ page }) => {
-  await page.getByRole('button', { name: 'System Settings' }).click();
+  await openView(page, 'System Settings');
   await page.getByRole('button', { name: '简体中文' }).click();
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
@@ -26,9 +27,9 @@ test('Chinese locale updates navigation and graph tools without losing the activ
 });
 
 test('English locale can be restored immediately', async ({ page }) => {
-  await page.getByRole('button', { name: 'System Settings' }).click();
+  await openView(page, 'System Settings');
   await page.getByRole('button', { name: '简体中文' }).click();
-  await page.getByRole('button', { name: '设置' }).click();
+  await openView(page, '设置');
   await page.getByRole('button', { name: 'English' }).click();
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en-US');

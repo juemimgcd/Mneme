@@ -37,7 +37,7 @@ function updateMultiAgent(event: Event) {
       v-model="selectedMode"
       data-testid="answer-mode-selector"
       class="chat-composer__modes"
-      :ariaLabel="'Answer mode'"
+      :ariaLabel="t('ai.answerMode')"
       :options="options"
       :disabled="running"
       size="sm"
@@ -53,11 +53,11 @@ function updateMultiAgent(event: Event) {
       />
       <span class="multi-agent__switch" aria-hidden="true"><i /></span>
       <span>
-        <strong>Multi-Agent thinking</strong>
+        <strong>{{ t("ai.multiAgent") }}</strong>
         <small>
           {{ workspace.chatMultiAgentAvailable.value
-            ? "Parallel retrieval with a final evidence review."
-            : "Available in Analysis mode." }}
+            ? t("ai.multiAgentDescription")
+            : t("ai.multiAgentUnavailable") }}
         </small>
       </span>
     </label>
@@ -72,28 +72,28 @@ function updateMultiAgent(event: Event) {
       <textarea
         v-model="workspace.chatQuestion.value"
         :placeholder="composerPlaceholder"
-        aria-label="Message Mneme"
+        :aria-label="t('ai.messageMneme')"
         rows="2"
       />
 
       <div v-if="running" class="chat-composer__run-control">
         <select
           v-model="workspace.chatControlMode.value"
-          aria-label="Run control mode"
+          :aria-label="t('ai.runControlMode')"
           :disabled="workspace.chatControlPending.value"
         >
-          <option value="steer">Steer now</option>
-          <option value="followup">Queue next</option>
+          <option value="steer">{{ t("ai.steerNow") }}</option>
+          <option value="followup">{{ t("ai.queueNext") }}</option>
         </select>
         <UiButton
           variant="secondary"
           size="sm"
           :disabled="workspace.chatControlPending.value || !workspace.chatQuestion.value.trim()"
-          aria-label="Apply run control"
+          :aria-label="t('ai.applyRunControl')"
           @click="workspace.controlActiveChatRun"
         >
           <template #icon><CornerDownLeft /></template>
-          Apply
+          {{ t("ai.apply") }}
         </UiButton>
       </div>
 
@@ -101,32 +101,32 @@ function updateMultiAgent(event: Event) {
         v-if="running"
         class="chat-composer__submit"
         variant="secondary"
-        aria-label="Stop generating"
+        :aria-label="t('ai.stopGenerating')"
         @click="workspace.cancelActiveChatRun"
       >
         <template #icon><Square /></template>
-        Stop
+        {{ t("ai.stop") }}
       </UiButton>
       <UiButton
         v-else-if="retryable"
         class="chat-composer__submit"
         variant="primary"
-        aria-label="Retry saved message"
+        :aria-label="t('ai.retrySaved')"
         @click="workspace.retryFailedChatMessage"
       >
         <template #icon><Send /></template>
-        Retry
+        {{ t("ai.retry") }}
       </UiButton>
       <UiButton
         v-else
         class="chat-composer__submit"
         variant="primary"
         type="submit"
-        aria-label="Send message"
+        :aria-label="t('ai.sendMessage')"
         :disabled="!workspace.chatQuestion.value.trim()"
       >
         <template #icon><Send /></template>
-        Send
+        {{ t("ai.send") }}
       </UiButton>
     </div>
 

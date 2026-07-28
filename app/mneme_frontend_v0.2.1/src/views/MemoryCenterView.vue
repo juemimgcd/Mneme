@@ -12,8 +12,10 @@ import UiStatusPanel from "../components/ui/UiStatusPanel.vue";
 import type { MnemeWorkspace } from "../composables/useMnemeWorkspace";
 import { useMemoryCenter } from "../composables/useMemoryCenter";
 import type { CanonicalMemory, MemoryCandidate } from "../types";
+import { useI18n } from "../composables/useI18n";
 
 const props = defineProps<{ workspace: MnemeWorkspace }>();
+const { t } = useI18n();
 const center = useMemoryCenter(
   props.workspace.token,
   props.workspace.activeKnowledgeBaseId,
@@ -50,14 +52,14 @@ function reportSuccess(message: string) {
 }
 
 function reportError() {
-  feedback.value = center.error.value || "Memory request failed.";
+  feedback.value = center.error.value || t("memory.requestFailed");
   feedbackTone.value = "error";
 }
 
 async function handleCandidateAction(item: MemoryCandidate, action: "confirm" | "reject") {
   await center.candidateAction(item, action);
   if (center.error.value) reportError();
-  else reportSuccess(action === "confirm" ? "Candidate approved and added to memory." : "Candidate rejected.");
+  else reportSuccess(t(action === "confirm" ? "memory.candidateApproved" : "memory.candidateRejected"));
 }
 
 async function handleSelect(memory: CanonicalMemory) {
@@ -77,7 +79,7 @@ async function handleRevise(value: string) {
     return;
   }
   saveState.value = "success";
-  saveMessage.value = "Revision saved and the audit history has been updated.";
+  saveMessage.value = t("memory.revisionSaved");
 }
 
 async function handleInvalidate() {
@@ -86,7 +88,7 @@ async function handleInvalidate() {
   if (center.error.value) reportError();
   else {
     mobilePane.value = "list";
-    reportSuccess("Memory invalidated. Its audit history has been retained.");
+    reportSuccess(t("memory.invalidated"));
   }
 }
 
@@ -96,7 +98,7 @@ async function handleRemove() {
   if (center.error.value) reportError();
   else {
     mobilePane.value = "list";
-    reportSuccess("Memory and its revisions were permanently deleted.");
+    reportSuccess(t("memory.deleted"));
   }
 }
 
@@ -105,7 +107,7 @@ async function handleSourcePurge(sourceId: string) {
   if (center.error.value) reportError();
   else {
     mobilePane.value = "list";
-    reportSuccess("Memories backed by the selected source were cleared.");
+    reportSuccess(t("memory.sourceCleared"));
   }
 }
 
@@ -114,8 +116,8 @@ async function handleSettingsToggle() {
   if (center.error.value) reportError();
   else reportSuccess(
     center.automaticConversationMemory.value
-      ? "Automatic conversation learning enabled."
-      : "Automatic conversation learning disabled.",
+      ? t("memory.learningEnabled")
+      : t("memory.learningDisabled"),
   );
 }
 
@@ -125,7 +127,7 @@ async function purgeKnowledgeBase() {
   else {
     purgeKnowledgeBaseOpen.value = false;
     mobilePane.value = "list";
-    reportSuccess("All governed memories in this knowledge base were cleared.");
+    reportSuccess(t("memory.knowledgeBaseCleared"));
   }
 }
 
@@ -135,7 +137,7 @@ async function purgeAccount() {
   else {
     purgeAccountOpen.value = false;
     mobilePane.value = "list";
-    reportSuccess("All long-term memory for this account was cleared.");
+    reportSuccess(t("memory.accountCleared"));
   }
 }
 </script>
@@ -144,10 +146,10 @@ async function purgeAccount() {
   <div class="memory-center">
     <header class="memory-center__header">
       <div>
-        <small>Governed long-term memory</small>
+        <small>{{ t("memory.kicker") }}</small>
         <div class="memory-center__title">
-          <h1>Memory Center</h1>
-          <span v-if="center.pendingCount.value">{{ center.pendingCount.value }} pending</span>
+          <h1>{{ t("nav.memory") }}</h1>
+          <span v-if="center.pendingCount.value">{{ t("memory.pendingCount", { count: center.pendingCount.value }) }}</span>
         </div>
       </div>
       <UiButton
@@ -157,7 +159,7 @@ async function purgeAccount() {
         @click="center.load"
       >
         <template #icon><RefreshCw /></template>
-        Refresh
+        {{ t("memory.refresh") }}
       </UiButton>
     </header>
 
@@ -181,13 +183,13 @@ async function purgeAccount() {
     <template v-else>
       <section class="learning-setting">
         <div>
-          <strong>Automatically learn from conversations</strong>
-          <small>New candidates still enter the review queue before becoming active memory.</small>
+          <strong>{{ t("memory.automaticLearning") }}</strong>
+          <small>{{ t("memory.automaticLearningDescription") }}</small>
         </div>
         <label class="learning-setting__switch">
           <input
             type="checkbox"
-            aria-label="Automatically learn from conversations"
+            :aria-label="t('memory.automaticLearning')"
             :checked="center.automaticConversationMemory.value"
             :disabled="center.pending.value || center.loading.value"
             @change="handleSettingsToggle"
@@ -207,8 +209,8 @@ async function purgeAccount() {
         <section class="memory-library">
           <header>
             <div>
-              <small>Memory library</small>
-              <h2>Active memories</h2>
+              <small>{{ t("memory.library") }}</small>
+              <h2>{{ t("memory.activeMemories") }}</h2>
             </div>
             <span>{{ center.memories.value.length }}</span>
           </header>
@@ -219,10 +221,11 @@ async function purgeAccount() {
             :selected-id="center.detail.value?.memory.memory_id"
             @select="handleSelect"
           />
+          <!-- Canonical state: "No active memories"; localized through memory.emptyTitle. -->
           <UiEmptyState
             v-else
-            title="No active memories"
-            description="Confirmed long-term memories will appear here."
+            :title="t('memory.emptyTitle')"
+            :description="t('memory.emptyDescription')"
           >
             <template #icon><Brain /></template>
           </UiEmptyState>
@@ -244,8 +247,8 @@ async function purgeAccount() {
         <UiEmptyState
           v-else
           class="memory-workspace__placeholder"
-          title="Select a memory"
-          description="Review its value, evidence, and revision history."
+          :title="t('memory.selectTitle')"
+          :description="t('memory.selectDescription')"
         >
           <template #icon><Brain /></template>
         </UiEmptyState>
@@ -254,12 +257,12 @@ async function purgeAccount() {
       <section class="danger-zone">
         <header>
           <div>
-            <small>Destructive controls</small>
-            <h2>Danger Zone</h2>
+            <small>{{ t("memory.destructiveControls") }}</small>
+            <h2>{{ t("memory.dangerZone") }}</h2>
           </div>
           <ShieldAlert aria-hidden="true" />
         </header>
-        <p>Purges permanently remove governed memory. Export or verify anything you need before continuing.</p>
+        <p>{{ t("memory.dangerDescription") }}</p>
         <div>
           <UiButton
             variant="danger"
@@ -267,11 +270,11 @@ async function purgeAccount() {
             @click="purgeKnowledgeBaseOpen = true"
           >
             <template #icon><Trash2 /></template>
-            Clear this knowledge base
+            {{ t("memory.clearKnowledgeBase") }}
           </UiButton>
           <UiButton variant="danger" :disabled="center.pending.value" @click="purgeAccountOpen = true">
             <template #icon><Trash2 /></template>
-            Clear all my memory
+            {{ t("memory.clearAccount") }}
           </UiButton>
         </div>
       </section>
@@ -280,18 +283,18 @@ async function purgeAccount() {
 
   <UiDialog
     v-model="purgeKnowledgeBaseOpen"
-    title="Clear this knowledge base?"
-    description="Every governed memory in the active knowledge base will be permanently removed. This action cannot be undone."
-    confirm-label="Clear knowledge base"
+    :title="t('memory.clearKnowledgeBaseTitle')"
+    :description="t('memory.clearKnowledgeBaseDescription')"
+    :confirm-label="t('memory.clearKnowledgeBase')"
     confirm-variant="danger"
     :busy="center.pending.value"
     @confirm="purgeKnowledgeBase"
   />
   <UiDialog
     v-model="purgeAccountOpen"
-    title="Clear all account memory?"
-    description="Final warning: this permanently removes long-term memory across every knowledge base in your account. This action cannot be undone."
-    confirm-label="Clear all memory"
+    :title="t('memory.clearAccountTitle')"
+    :description="t('memory.clearAccountDescription')"
+    :confirm-label="t('memory.clearAccount')"
     confirm-variant="danger"
     :busy="center.pending.value"
     @confirm="purgeAccount"
