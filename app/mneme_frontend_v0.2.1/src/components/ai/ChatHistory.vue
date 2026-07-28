@@ -1,53 +1,118 @@
 <script setup lang="ts">
 import { MessageSquare, Plus, Search, X } from "@lucide/vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { ChatSessionData } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 import UiButton from "../ui/UiButton.vue";
 import UiEmptyState from "../ui/UiEmptyState.vue";
 
-defineProps<{
+const props = defineProps<{
   sessions: ChatSessionData[];
   activeSessionId: string;
   collapsed: boolean;
   formatDate: (value: string | number | Date) => string;
+  modal: boolean;
 }>();
 
 const filter = defineModel<string>("filter", { required: true });
-defineEmits<{
+const emit = defineEmits<{
   close: [];
   create: [];
   select: [sessionId: string];
 }>();
+const { t } = useI18n();
+const panel = ref<HTMLElement | null>(null);
+let previousFocus: HTMLElement | null = null;
+let previousOverflow = "";
+let modalActive = false;
+
+function onKeydown(event: KeyboardEvent) {
+  if (!props.modal || props.collapsed) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    emit("close");
+    return;
+  }
+  if (event.key !== "Tab" || !panel.value) return;
+  const focusable = [...panel.value.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+  )];
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function releaseModal(restoreFocus: boolean) {
+  if (!modalActive) return;
+  const returnFocus = previousFocus;
+  document.removeEventListener("keydown", onKeydown);
+  document.body.style.overflow = previousOverflow;
+  previousFocus = null;
+  modalActive = false;
+  if (restoreFocus) void nextTick(() => returnFocus?.focus());
+}
+
+watch(
+  () => [props.collapsed, props.modal] as const,
+  async ([collapsed, modal], previous) => {
+    if (!collapsed && modal) {
+      previousFocus = document.activeElement as HTMLElement | null;
+      previousOverflow = document.body.style.overflow;
+      modalActive = true;
+      document.body.style.overflow = "hidden";
+      document.addEventListener("keydown", onKeydown);
+      await nextTick();
+      panel.value?.querySelector<HTMLElement>("button, input")?.focus();
+      return;
+    }
+    if (previous && !previous[0] && previous[1]) releaseModal(true);
+  },
+);
+
+onBeforeUnmount(() => releaseModal(false));
 </script>
 
 <template>
   <aside
+    ref="panel"
     data-testid="ai-history-rail"
     class="chat-history"
     :aria-hidden="collapsed"
     :inert="collapsed || undefined"
+    :role="modal ? 'dialog' : undefined"
+    :aria-modal="modal && !collapsed ? 'true' : undefined"
+    :aria-label="t('ai.chatHistory')"
+    tabindex="-1"
   >
     <header class="chat-history__header">
       <div>
-        <small>Workspace</small>
-        <h2>Chats</h2>
+        <small>{{ t("ai.workspace") }}</small>
+        <h2>{{ t("ai.chats") }}</h2>
       </div>
-      <UiButton class="chat-history__close" variant="ghost" size="sm" aria-label="Close chat history" @click="$emit('close')">
+      <UiButton class="chat-history__close" variant="ghost" size="sm" :aria-label="t('ai.closeHistory')" @click="$emit('close')">
         <template #icon><X /></template>
       </UiButton>
     </header>
 
     <UiButton class="chat-history__new" variant="primary" @click="$emit('create')">
       <template #icon><Plus /></template>
-      New chat
+      {{ t("ai.newChat") }}
     </UiButton>
 
     <label class="chat-history__search">
       <Search aria-hidden="true" />
-      <span class="sr-only">Search chat history</span>
-      <input v-model="filter" type="search" placeholder="Search history..." />
+      <span class="sr-only">{{ t("ai.searchHistory") }}</span>
+      <input v-model="filter" type="search" :placeholder="t('ai.search')" />
     </label>
 
-    <nav aria-label="Chat history">
+    <nav :aria-label="t('ai.chatHistory')">
       <button
         v-for="session in sessions"
         :key="session.id"
@@ -58,16 +123,16 @@ defineEmits<{
       >
         <MessageSquare aria-hidden="true" />
         <span>
-          <strong>{{ session.title || "Untitled chat" }}</strong>
-          <small>{{ session.last_message_at ? formatDate(session.last_message_at) : "No messages" }}</small>
+          <strong>{{ session.title || t("ai.untitledChat") }}</strong>
+          <small>{{ session.last_message_at ? formatDate(session.last_message_at) : t("ai.noMessages") }}</small>
         </span>
       </button>
     </nav>
 
     <UiEmptyState
       v-if="!sessions.length"
-      title="No chats found"
-      description="Create a new chat or clear the search."
+      :title="t('ai.noChatsTitle')"
+      :description="t('ai.noChatsDescription')"
     >
       <template #icon><MessageSquare /></template>
     </UiEmptyState>
@@ -200,7 +265,7 @@ defineEmits<{
     background: var(--surface-raised);
   }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .chat-history {
     position: fixed;
     inset: 0;

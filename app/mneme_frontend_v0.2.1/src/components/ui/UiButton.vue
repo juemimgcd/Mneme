@@ -61,7 +61,7 @@ const classes = computed(() => [
 .ui-button--danger { color: var(--status-danger); background: transparent; border-color: color-mix(in srgb, var(--status-danger) 42%, var(--stroke-subtle)); }
 
 @media (hover: hover) and (pointer: fine) {
-  .ui-button--primary:hover:not(:disabled) { color: #fff; background: var(--accent-hover); }
+  .ui-button--primary:hover:not(:disabled) { color: var(--accent-on-primary); background: var(--accent-hover); }
   .ui-button--secondary:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--stroke-default); }
   .ui-button--ghost:hover:not(:disabled) { color: var(--content-primary); background: var(--surface-raised); }
   .ui-button--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--status-danger) 10%, transparent); }

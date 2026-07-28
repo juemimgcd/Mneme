@@ -1,21 +1,32 @@
 <script setup lang="ts">
 import { ChevronLeft, File, FolderPlus, Network, Play, Search, Send, SlidersHorizontal, Target, X, ZoomIn, ZoomOut } from "@lucide/vue";
-import { computed, onBeforeUnmount, ref, watchEffect } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
 import type { MnemeWorkspace } from "../composables/useMnemeWorkspace";
 import type { GraphNodeData } from "../types";
 import { useI18n } from "../composables/useI18n";
 import { useGraphInteraction } from "../composables/useGraphInteraction";
 import UiEmptyState from "../components/ui/UiEmptyState.vue";
+import UiPopover from "../components/ui/UiPopover.vue";
 
 const props = defineProps<{ workspace: MnemeWorkspace }>();
 const { t } = useI18n();
-const railCollapsed = ref(window.matchMedia("(max-width: 1023px)").matches);
+const compactMedia = window.matchMedia("(max-width: 1024px)");
+const previewSheetMedia = window.matchMedia("(max-width: 900px)");
+const isCompact = ref(compactMedia.matches);
+const isPreviewSheet = ref(previewSheetMedia.matches);
+const railCollapsed = ref(compactMedia.matches);
 const filtersOpen = ref(false);
 const zoom = ref(1);
 const graphViewBox = ref("0 0 760 680");
 const graphSvg = ref<SVGSVGElement | null>(null);
 const hoveredNodeId = ref<string | null>(null);
 const previewInstant = ref(false);
+const railPanel = ref<HTMLElement | null>(null);
+const railTrigger = ref<HTMLButtonElement | null>(null);
+const previewPanel = ref<HTMLElement | null>(null);
+let railPreviousFocus: HTMLElement | null = null;
+let previewPreviousFocus: HTMLElement | SVGElement | null = null;
+let previewTrigger: HTMLElement | SVGElement | null = null;
 let dragState: { nodeId: string; pointerId: number; startX: number; startY: number; moved: boolean; started: boolean } | null = null;
 let suppressOpenUntil = 0;
 let lastNodePointerDown: { nodeId: string; at: number } | null = null;
@@ -51,6 +62,7 @@ function cancelPendingSelection() {
 
 function startGraphNodeDrag(node: GraphNodeData, event: PointerEvent) {
   event.stopPropagation();
+  previewTrigger = event.currentTarget as SVGElement;
   const now = performance.now();
   const isDoubleActivation = lastNodePointerDown?.nodeId === node.id && now - lastNodePointerDown.at < 360;
   lastNodePointerDown = { nodeId: node.id, at: now };
@@ -158,6 +170,93 @@ function openDocumentFromRail(documentId: string) {
   void props.workspace.openDocument(documentId);
 }
 
+function focusableElements(container: HTMLElement) {
+  return [...container.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+  )];
+}
+
+function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = focusableElements(container);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function closeRail() {
+  railCollapsed.value = true;
+}
+
+function toggleRail() {
+  railCollapsed.value = !railCollapsed.value;
+}
+
+function onOverlayKeydown(event: KeyboardEvent) {
+  if (filtersOpen.value) return;
+  if (event.key === "Escape") {
+    if (previewNode.value && isPreviewSheet.value) {
+      event.preventDefault();
+      hideGraphDocumentPreview();
+      return;
+    }
+    if (!railCollapsed.value && isCompact.value) {
+      event.preventDefault();
+      closeRail();
+      return;
+    }
+  }
+  if (!railCollapsed.value && isCompact.value) trapFocus(event, railPanel.value);
+  else if (previewNode.value && isPreviewSheet.value) trapFocus(event, previewPanel.value);
+}
+
+function syncCompact() {
+  isCompact.value = compactMedia.matches;
+  railCollapsed.value = compactMedia.matches;
+}
+
+function syncPreviewSheet() {
+  isPreviewSheet.value = previewSheetMedia.matches;
+}
+
+watch(railCollapsed, async (collapsed, previous) => {
+  if (!isCompact.value) return;
+  if (!collapsed) {
+    railPreviousFocus = document.activeElement as HTMLElement | null;
+    await nextTick();
+    railPanel.value?.querySelector<HTMLElement>("button")?.focus();
+  } else if (previous === false && railPreviousFocus) {
+    const returnFocus = railPreviousFocus;
+    railPreviousFocus = null;
+    await nextTick();
+    returnFocus.focus();
+  }
+});
+
+watch([previewNode, isPreviewSheet], async ([node, sheet], [previousNode, previousSheet]) => {
+  const modalOpen = Boolean(node && sheet);
+  const modalWasOpen = Boolean(previousNode && previousSheet);
+  if (modalOpen && !modalWasOpen) {
+    const activeElement = document.activeElement as HTMLElement | SVGElement | null;
+    previewPreviousFocus = activeElement && activeElement !== document.body ? activeElement : previewTrigger;
+    await nextTick();
+    if (previewNode.value && isPreviewSheet.value) previewPanel.value?.focus();
+  } else if (!modalOpen && modalWasOpen) {
+    const returnFocus = previewPreviousFocus;
+    previewPreviousFocus = null;
+    previewTrigger = null;
+    await nextTick();
+    returnFocus?.focus();
+  }
+});
+
 watchEffect(() => {
   if (pendingSelectionNodeId && !interaction.visibleNodes.value.some((node) => node.id === pendingSelectionNodeId)) {
     cancelPendingSelection();
@@ -174,6 +273,15 @@ watchEffect(() => {
 onBeforeUnmount(() => {
   cancelPendingSelection();
   props.workspace.clearDocumentPreview();
+  document.removeEventListener("keydown", onOverlayKeydown);
+  compactMedia.removeEventListener("change", syncCompact);
+  previewSheetMedia.removeEventListener("change", syncPreviewSheet);
+});
+
+onMounted(() => {
+  document.addEventListener("keydown", onOverlayKeydown);
+  compactMedia.addEventListener("change", syncCompact);
+  previewSheetMedia.addEventListener("change", syncPreviewSheet);
 });
 
 function nodeTypeLabel(nodeType: string) {
@@ -207,17 +315,48 @@ function edgeFocusState(source: string, target: string) {
 </script>
 
 <template>
-  <div data-testid="stitch-graph-layout" class="graph-layout" title="Graph Workspace">
+  <div data-testid="stitch-graph-layout" class="graph-layout" :title="t('graph.workspace')">
     <div data-testid="graph-function-grid" class="graph-grid" :class="{ 'graph-grid--rail-closed': railCollapsed }">
-      <aside data-testid="graph-file-rail" class="graph-file-panel" :aria-hidden="railCollapsed" :inert="railCollapsed ? true : undefined">
-        <header><div><small>{{ t("graph.activeVault") }}</small><h2>{{ t("graph.files") }}</h2></div><FolderPlus class="size-4" /></header>
+      <aside
+        ref="railPanel"
+        data-testid="graph-file-rail"
+        class="graph-file-panel"
+        :aria-hidden="railCollapsed"
+        :inert="railCollapsed ? true : undefined"
+        :role="isCompact ? 'dialog' : undefined"
+        :aria-modal="isCompact && !railCollapsed ? 'true' : undefined"
+        :aria-label="t('graph.files')"
+        tabindex="-1"
+      >
+        <header>
+          <div><small>{{ t("graph.activeVault") }}</small><h2>{{ t("graph.files") }}</h2></div>
+          <button v-if="isCompact" type="button" :aria-label="t('graph.closeFiles')" @click="closeRail"><X /></button>
+          <FolderPlus v-else class="size-4" />
+        </header>
         <nav>
           <button v-for="doc in workspace.selectedDocuments.value" :key="doc.id" :class="{ active: workspace.documentPreview.value?.document_id === doc.id }" @click="openDocumentFromRail(doc.id)"><File /><span>{{ doc.file_name }}</span></button>
         </nav>
       </aside>
 
-      <section class="graph-canvas" :data-simulation-phase="interaction.simulationPhase.value">
-        <div data-testid="graph-output-workspace" class="graph-stage" :data-simulation-phase="interaction.simulationPhase.value">
+      <button
+        v-if="isCompact && !railCollapsed"
+        type="button"
+        class="graph-rail-scrim"
+        :aria-label="t('graph.closeFiles')"
+        @click="closeRail"
+      />
+
+      <section
+        class="graph-canvas"
+        :data-simulation-phase="interaction.simulationPhase.value"
+        :inert="isCompact && !railCollapsed ? true : undefined"
+      >
+        <div
+          data-testid="graph-output-workspace"
+          class="graph-stage"
+          :data-simulation-phase="interaction.simulationPhase.value"
+          :inert="isPreviewSheet && previewNode ? true : undefined"
+        >
         <div class="graph-toolbar">
           <div class="graph-title"><Network /><span>{{ t("graph.view") }}</span></div>
           <form @submit.prevent="workspace.runGraphRag"><Search /><input v-model="workspace.graphRagQuestion.value" :placeholder="t('graph.search')" /><button :aria-label="t('graph.run')"><Send /></button></form>
@@ -225,19 +364,23 @@ function edgeFocusState(source: string, target: string) {
             <button :class="{ active: interaction.activeFilter.value === 'all' }" :aria-pressed="interaction.activeFilter.value === 'all'" @click="setGraphFilter('all')">{{ t("graph.allNodes") }}</button>
             <button :class="{ active: interaction.activeFilter.value === 'tags' }" :aria-pressed="interaction.activeFilter.value === 'tags'" @click="setGraphFilter('tags')">{{ t("graph.tags") }}</button>
             <button :class="{ active: interaction.activeFilter.value === 'orphans' }" :aria-pressed="interaction.activeFilter.value === 'orphans'" @click="setGraphFilter('orphans')">{{ t("graph.orphans") }}</button>
-            <button :aria-label="t('graph.filters')" :aria-expanded="filtersOpen" @click="filtersOpen = !filtersOpen"><SlidersHorizontal /></button>
+            <UiPopover v-model="filtersOpen" align="end" :aria-label="t('graph.nodeTypes')">
+              <template #trigger="{ props: triggerProps }">
+                <button v-bind="triggerProps" type="button" :aria-label="t('graph.filters')"><SlidersHorizontal /></button>
+              </template>
+              <div data-testid="graph-node-type-filters" class="graph-filter-panel" role="group" :aria-label="t('graph.nodeTypes')">
+                <small>{{ t("graph.nodeTypes") }}</small>
+                <button v-for="nodeType in interaction.nodeTypes.value" :key="nodeType" :class="{ active: interaction.isNodeTypeEnabled(nodeType) }" :aria-pressed="interaction.isNodeTypeEnabled(nodeType)" @click="toggleGraphNodeType(nodeType)">{{ nodeTypeLabel(nodeType) }}</button>
+              </div>
+            </UiPopover>
           </div>
-        </div>
-        <div v-if="filtersOpen" data-testid="graph-node-type-filters" class="graph-filter-panel">
-          <small>{{ t("graph.nodeTypes") }}</small>
-          <button v-for="nodeType in interaction.nodeTypes.value" :key="nodeType" :class="{ active: interaction.isNodeTypeEnabled(nodeType) }" :aria-pressed="interaction.isNodeTypeEnabled(nodeType)" @click="toggleGraphNodeType(nodeType)">{{ nodeTypeLabel(nodeType) }}</button>
         </div>
         <p v-if="workspace.graphRagStatus.value" class="graph-status">{{ workspace.graphRagStatus.value }}</p>
 
         <UiEmptyState v-if="!positionedNodes.length" :title="t('graph.emptyTitle')" :description="t('graph.emptyDescription')">
           <template #icon><Network class="size-5" /></template>
         </UiEmptyState>
-        <svg v-else ref="graphSvg" :viewBox="graphViewBox" role="img" aria-label="Knowledge graph" @pointerdown="clearGraphSelection" @pointermove="moveGraphNodeDrag" @pointerup="endGraphNodeDrag" @pointercancel="endGraphNodeDrag" @pointerleave="endGraphNodeDrag">
+        <svg v-else ref="graphSvg" :viewBox="graphViewBox" role="img" :aria-label="t('graph.knowledgeGraph')" @pointerdown="clearGraphSelection" @pointermove="moveGraphNodeDrag" @pointerup="endGraphNodeDrag" @pointercancel="endGraphNodeDrag" @pointerleave="endGraphNodeDrag">
           <g class="graph-edges" stroke="var(--border-strong)" stroke-width="1">
             <line v-for="edge in positionedEdges" :key="edge.id" :data-focus-state="edgeFocusState(edge.source, edge.target)" :x1="edge.sourceNode!.x" :y1="edge.sourceNode!.y" :x2="edge.targetNode!.x" :y2="edge.targetNode!.y" />
           </g>
@@ -247,16 +390,34 @@ function edgeFocusState(source: string, target: string) {
           </g>
         </svg>
 
-        <button data-testid="graph-file-rail-toggle" class="rail-toggle" :title="railCollapsed ? 'Expand file list' : 'Collapse file list'" @click="railCollapsed = !railCollapsed"><ChevronLeft :class="{ rotate: railCollapsed }" /></button>
-        <div class="zoom-controls"><button aria-label="Zoom in graph" @click="setZoom(zoom + 0.15)"><ZoomIn /></button><button aria-label="Zoom out graph" @click="setZoom(zoom - 0.15)"><ZoomOut /></button><button aria-label="Center graph" @click="centerGraph"><Target /></button><button aria-label="Restart graph layout" @click="restartGraphLayout"><Play /></button></div>
+        <button ref="railTrigger" data-testid="graph-file-rail-toggle" class="rail-toggle" :title="railCollapsed ? t('graph.expandFiles') : t('graph.collapseFiles')" @click="toggleRail"><ChevronLeft :class="{ rotate: railCollapsed }" /></button>
+        <div class="zoom-controls"><button :aria-label="t('graph.zoomIn')" @click="setZoom(zoom + 0.15)"><ZoomIn /></button><button :aria-label="t('graph.zoomOut')" @click="setZoom(zoom - 0.15)"><ZoomOut /></button><button :aria-label="t('graph.center')" @click="centerGraph"><Target /></button><button :aria-label="t('graph.restart')" @click="restartGraphLayout"><Play /></button></div>
         </div>
 
+        <button
+          v-if="previewNode && isPreviewSheet"
+          type="button"
+          class="graph-preview-scrim"
+          :aria-label="t('graph.closePreview')"
+          @click="hideGraphDocumentPreview"
+        />
+
         <Transition name="graph-preview">
-          <aside v-if="previewNode" data-testid="graph-document-preview-panel" class="graph-preview" :class="{ 'graph-preview--instant': previewInstant }">
+          <aside
+            v-if="previewNode"
+            ref="previewPanel"
+            data-testid="graph-document-preview-panel"
+            class="graph-preview"
+            :class="{ 'graph-preview--instant': previewInstant }"
+            :role="isPreviewSheet ? 'dialog' : undefined"
+            :aria-modal="isPreviewSheet ? 'true' : undefined"
+            :aria-label="t('graph.preview')"
+            tabindex="-1"
+          >
             <header><small>{{ t("graph.properties") }}</small><button :aria-label="t('graph.closePreview')" @click="hideGraphDocumentPreview"><X /></button></header>
             <h2>{{ workspace.documentPreview.value?.file_name ?? previewNode.label }}</h2>
             <div class="tags"><span>#{{ previewNode.node_type }}</span><span>#{{ workspace.documentPreview.value?.file_type ?? "graph" }}</span></div>
-            <section><small>{{ t("graph.summary") }}</small><p>{{ workspace.documentPreview.value?.summary ?? `${previewNode.label} is linked inside the active knowledge graph.` }}</p><a href="#document" @click.prevent="openSelectedDocument">{{ t("graph.readFull") }}</a></section>
+            <section><small>{{ t("graph.summary") }}</small><p>{{ workspace.documentPreview.value?.summary ?? t("graph.fallbackSummary", { name: previewNode.label }) }}</p><a href="#document" @click.prevent="openSelectedDocument">{{ t("graph.readFull") }}</a></section>
             <section v-if="workspace.documentPreview.value?.memory_entries.length"><small>{{ t("graph.backlinks") }}</small><article v-for="entry in workspace.documentPreview.value.memory_entries" :key="entry.entry_id"><strong>{{ entry.entry_name }}</strong><p>{{ entry.summary }}</p></article></section>
           </aside>
         </Transition>
@@ -272,6 +433,7 @@ function edgeFocusState(source: string, target: string) {
 .graph-file-panel { min-width: 0; overflow: auto; background: var(--bg-sidebar); border-right: 1px solid var(--border-muted); }
 .graph-file-panel[aria-hidden="true"] { visibility: hidden; overflow: hidden; pointer-events: none; }
 .graph-file-panel header { display: flex; height: 3.5rem; align-items: center; justify-content: space-between; padding: 0 1rem; border-bottom: 1px solid var(--border-muted); }
+.graph-file-panel header button { display: grid; width: 2rem; height: 2rem; place-items: center; color: var(--text-secondary); background: transparent; border: 0; border-radius: var(--radius-control); }
 .graph-file-panel small { color: var(--text-tertiary); font: 0.62rem var(--font-mono); text-transform: uppercase; }
 .graph-file-panel h2 { margin: 0.1rem 0 0; font-size: 0.9rem; }
 .graph-file-panel nav { display: grid; gap: 0.2rem; padding: 0.8rem; }
@@ -294,7 +456,7 @@ function edgeFocusState(source: string, target: string) {
 .graph-node[data-focus-state="selected"] circle { stroke: var(--accent); stroke-width: 3; }
 .graph-node[data-focus-state="neighbor"] { opacity: 0.94; }
 .graph-edges line[data-focus-state="connected"] { opacity: 0.9; stroke: color-mix(in srgb, var(--accent) 52%, var(--border-strong)); stroke-width: 1.4; }
-.graph-toolbar { position: absolute; top: 1rem; right: 1rem; left: 1rem; z-index: 10; display: grid; min-width: 0; grid-template-columns: auto minmax(14rem, 1fr) auto; align-items: center; gap: 0.35rem; padding: 0.35rem; background: color-mix(in srgb, var(--bg-panel) 94%, transparent); border: 1px solid var(--border-muted); border-radius: 0.55rem; box-shadow: var(--shadow-float); backdrop-filter: blur(12px); }
+.graph-toolbar { position: absolute; top: 4.25rem; right: 1rem; left: 1rem; z-index: 10; display: grid; min-width: 0; grid-template-columns: auto minmax(14rem, 1fr) auto; align-items: center; gap: 0.35rem; padding: 0.35rem; background: color-mix(in srgb, var(--bg-panel) 94%, transparent); border: 1px solid var(--border-muted); border-radius: 0.55rem; box-shadow: var(--shadow-float); backdrop-filter: blur(12px); }
 .graph-title, .graph-toolbar form, .graph-tabs, .zoom-controls { display: flex; align-items: center; }
 .graph-title { height: 2.5rem; gap: 0.5rem; padding: 0 0.65rem; font-size: 0.78rem; white-space: nowrap; }
 .graph-title svg { width: 1rem; color: var(--accent); }
@@ -307,12 +469,13 @@ function edgeFocusState(source: string, target: string) {
 .graph-tabs button { height: 2rem; padding: 0 0.65rem; font-size: 0.72rem; }
 .graph-tabs button.active { color: var(--accent); background: var(--accent-soft); }
 .graph-tabs svg { width: 1rem; }
-.graph-filter-panel { position: absolute; top: 4.6rem; right: 1rem; z-index: 18; display: flex; max-width: min(34rem, calc(100% - 2rem)); flex-wrap: wrap; gap: 0.35rem; padding: 0.65rem; background: var(--bg-panel); border: 1px solid var(--border-muted); border-radius: 0.45rem; box-shadow: var(--shadow-float); }
+.graph-filter-panel { display: flex; width: min(32rem, calc(100vw - 2rem)); flex-wrap: wrap; gap: 0.35rem; }
 .graph-filter-panel small { width: 100%; color: var(--text-tertiary); font: 0.62rem var(--font-mono); text-transform: uppercase; }
 .graph-filter-panel button { padding: 0.35rem 0.55rem; color: var(--text-secondary); background: var(--bg-canvas); border: 1px solid var(--border-muted); border-radius: 0.35rem; font-size: 0.7rem; text-transform: capitalize; }
 .graph-filter-panel button.active { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, var(--border-muted)); }
-.graph-status { position: absolute; top: 4.6rem; left: 1rem; z-index: 12; max-width: min(28rem, calc(100% - 2rem)); padding: 0.65rem 0.8rem; color: var(--text-secondary); background: var(--bg-panel); border-left: 2px solid var(--accent); font-size: 0.75rem; }
-.graph-preview { position: relative; z-index: 25; width: 320px; min-height: 0; overflow: auto; padding: 1rem; background: var(--bg-panel); border-left: 1px solid var(--border-muted); }
+.graph-status { position: absolute; top: 7.85rem; left: 1rem; z-index: 12; max-width: min(28rem, calc(100% - 2rem)); padding: 0.65rem 0.8rem; color: var(--text-secondary); background: var(--bg-panel); border-left: 2px solid var(--accent); font-size: 0.75rem; }
+.graph-preview { position: relative; z-index: 45; width: 320px; min-height: 0; overflow: auto; padding: 1rem; background: var(--bg-panel); border-left: 1px solid var(--border-muted); }
+.graph-preview-scrim { position: absolute; inset: 0; z-index: 44; width: 100%; background: rgb(0 0 0 / 34%); border: 0; }
 .graph-preview header { display: flex; justify-content: space-between; }
 .graph-preview header small, .graph-preview section small { color: var(--text-tertiary); font: 0.64rem var(--font-mono); text-transform: uppercase; }
 .graph-preview button svg { width: 1rem; }
@@ -330,13 +493,14 @@ function edgeFocusState(source: string, target: string) {
 .rail-toggle { position: absolute; top: 50%; left: 0.4rem; z-index: 35; display: grid; width: 2.2rem; height: 2.6rem; place-items: center; color: var(--text-secondary); background: var(--bg-panel); border: 1px solid var(--border-muted); border-radius: 0.4rem; }
 .rail-toggle svg { width: 1rem; }
 .rail-toggle svg.rotate { transform: rotate(180deg); }
+.graph-rail-scrim { position: absolute; inset: 0; z-index: 29; width: 100%; background: rgb(0 0 0 / 38%); border: 0; }
 .zoom-controls { position: absolute; right: 1rem; bottom: 3.5rem; gap: 0.15rem; padding: 0.25rem; background: var(--bg-panel); border: 1px solid var(--border-muted); border-radius: 0.45rem; box-shadow: var(--shadow-float); }
 .zoom-controls button { width: 2.3rem; height: 2.3rem; }
 .zoom-controls svg { width: 1rem; }
 @media (hover: hover) and (pointer: fine) {
   .graph-toolbar form button:hover, .graph-tabs button:hover, .zoom-controls button:hover, .graph-preview button:hover { color: var(--accent); background: var(--accent-soft); }
 }
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .graph-grid, .graph-grid.graph-grid--rail-closed { grid-template-columns: minmax(0, 1fr); }
   .graph-file-panel { position: absolute; inset: 0 auto 0 0; z-index: 30; width: min(84vw, 320px); box-shadow: var(--shadow-float); }
   .graph-file-panel[aria-hidden="true"] { display: none; }
@@ -348,12 +512,12 @@ function edgeFocusState(source: string, target: string) {
   .graph-preview-enter-from, .graph-preview-leave-to { transform: translateY(100%); }
 }
 @media (max-width: 767px) {
-  .graph-toolbar { top: 0.6rem; right: 0.6rem; left: 0.6rem; grid-template-columns: 2.5rem minmax(0, 1fr); }
+  .graph-toolbar { top: 3.85rem; right: 0.6rem; left: 0.6rem; grid-template-columns: 2.5rem minmax(0, 1fr); }
   .graph-title { width: 2.5rem; padding: 0; justify-content: center; }
   .graph-title span { display: none; }
   .graph-toolbar form { width: 100%; }
   .graph-tabs { grid-column: 1 / -1; overflow-x: auto; }
-  .graph-filter-panel, .graph-status { top: 7.5rem; }
+  .graph-status { top: 10.75rem; }
   .graph-stage > svg { min-height: 560px; }
   .zoom-controls { right: 0.75rem; bottom: 4.25rem; }
 }

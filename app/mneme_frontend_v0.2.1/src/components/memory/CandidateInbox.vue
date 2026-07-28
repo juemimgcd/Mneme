@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, X } from "@lucide/vue";
 import type { MemoryCandidate } from "../../types";
+import { useI18n } from "../../composables/useI18n";
 import UiButton from "../ui/UiButton.vue";
 
 defineProps<{
@@ -10,14 +11,15 @@ defineProps<{
 defineEmits<{
   action: [item: MemoryCandidate, action: "confirm" | "reject"];
 }>();
+const { t } = useI18n();
 </script>
 
 <template>
   <section class="candidate-inbox" aria-labelledby="candidate-inbox-title">
     <header>
       <div>
-        <small>Review queue</small>
-        <h2 id="candidate-inbox-title">Pending review</h2>
+        <small>{{ t("memory.reviewQueue") }}</small>
+        <h2 id="candidate-inbox-title">{{ t("memory.pendingReview") }}</h2>
       </div>
       <span>{{ items.length }}</span>
     </header>
@@ -25,7 +27,7 @@ defineEmits<{
     <div class="candidate-inbox__list">
       <article v-for="item in items" :key="item.candidate_id">
         <div>
-          <small>{{ item.memory_type }} · {{ Math.round(item.confidence * 100) }}% confidence</small>
+          <small>{{ item.memory_type }} · {{ t("memory.confidence", { value: Math.round(item.confidence * 100) }) }}</small>
           <p>
             <span>{{ item.subject }} {{ item.predicate }}</span>
             <strong>{{ item.value }}</strong>
@@ -36,15 +38,15 @@ defineEmits<{
             variant="primary"
             size="sm"
             :disabled="pending"
-            aria-label="Confirm"
+            :aria-label="t('memory.confirm')"
             @click="$emit('action', item, 'confirm')"
           >
             <template #icon><Check /></template>
-            Approve
+            {{ t("memory.approve") }}
           </UiButton>
           <UiButton variant="ghost" size="sm" :disabled="pending" @click="$emit('action', item, 'reject')">
             <template #icon><X /></template>
-            Reject
+            {{ t("memory.reject") }}
           </UiButton>
         </div>
       </article>

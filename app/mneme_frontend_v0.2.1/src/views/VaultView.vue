@@ -149,6 +149,13 @@ async function focusDrawerPane(id: string) {
   window.requestAnimationFrame(focusWhenVisible);
 }
 
+function closeCompactPanes() {
+  const restoreTarget = treeOpen.value ? filesTrigger.value : propertiesTrigger.value;
+  treeOpen.value = false;
+  propertiesOpen.value = false;
+  void nextTick(() => restoreTarget?.focus());
+}
+
 async function toggleTree() {
   const opening = !treeOpen.value;
   treeOpen.value = opening;
@@ -263,9 +270,9 @@ onBeforeUnmount(() => {
       :inert="isCompact && !propertiesOpen ? true : undefined"
       @select-version="openDocument"
     />
-    <button v-if="isCompact && (treeOpen || propertiesOpen)" class="pane-scrim" :aria-label="treeOpen ? t('reader.closeFiles') : t('reader.closeProperties')" @click="treeOpen = false; propertiesOpen = false" />
-    <button v-if="treeOpen" class="overlay-dismiss tree-dismiss" :aria-label="t('reader.closeFiles')" @click="treeOpen = false; filesTrigger?.focus()"><X /></button>
-    <button v-if="propertiesOpen" class="overlay-dismiss properties-dismiss" :aria-label="t('reader.closeProperties')" @click="propertiesOpen = false; propertiesTrigger?.focus()"><X /></button>
+    <button v-if="isCompact && (treeOpen || propertiesOpen)" class="pane-scrim" :aria-label="treeOpen ? t('reader.closeFiles') : t('reader.closeProperties')" @click="closeCompactPanes" />
+    <button v-if="treeOpen" class="overlay-dismiss tree-dismiss" :aria-label="t('reader.closeFiles')" @click="closeCompactPanes"><X /></button>
+    <button v-if="propertiesOpen" class="overlay-dismiss properties-dismiss" :aria-label="t('reader.closeProperties')" @click="closeCompactPanes"><X /></button>
 
     <UiDialog
       v-model="deleteDialogOpen"

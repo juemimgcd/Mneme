@@ -55,7 +55,9 @@ const VIEW_ITEMS = computed<ViewItem[]>(() => [
 const currentViewItem = computed(() => VIEW_ITEMS.value.find((item) => item.id === workspace.view.value) ?? VIEW_ITEMS.value[0]);
 const primaryNavigationItems = computed(() => VIEW_ITEMS.value.slice(0, 4));
 const secondaryNavigationItems = computed(() => VIEW_ITEMS.value.slice(4));
-const moreNavigationActive = computed(() => secondaryNavigationItems.value.some((item) => item.id === workspace.view.value) || shell.moreOpen.value);
+const moreNavigationActive = computed(() => secondaryNavigationItems.value.some((item) => item.id === workspace.view.value));
+const viewOwnsResourceSidebar = computed(() => ["notes", "graph", "ai"].includes(workspace.view.value));
+const shellResourceOpen = computed(() => !viewOwnsResourceSidebar.value && shell.resourceOpen.value);
 const activeHealthLabel = computed(() => workspace.readiness.value?.overall_status ?? workspace.serviceHealth.value?.status ?? "preview");
 const activeViewLoadState = computed(() => workspace.viewLoadStates[workspace.view.value]);
 const activeViewLoading = computed(() => activeViewLoadState.value.phase.value === "loading");
@@ -149,17 +151,20 @@ function openCreateCommand() {
       :aria-label="t('reader.uploadDocument')"
       @change="workspace.uploadFile(($event.target as HTMLInputElement).files?.[0])"
     />
-    <div class="mneme-shell" :class="{ 'mneme-shell--resource-closed': !shell.resourceOpen.value }">
+    <div class="mneme-shell" :class="{ 'mneme-shell--resource-closed': !shellResourceOpen }">
       <ActivityBar
         :items="VIEW_ITEMS"
         :active-id="workspace.view.value"
-        :resource-open="shell.resourceOpen.value"
+        :resource-open="shellResourceOpen"
+        :resource-toggle-visible="!viewOwnsResourceSidebar"
         @create="openCreateCommand"
+        @documentation="workspace.showDocumentationStatus"
+        @support="workspace.showSupportStatus"
         @toggle-resource="shell.toggleResource"
         @navigate="navigate"
       />
 
-      <ResourceSidebar :open="shell.resourceOpen.value" @close="shell.closeOverlays">
+      <ResourceSidebar :open="shellResourceOpen" @close="shell.closeOverlays">
         <div data-testid="sanctuary-sidebar" class="explorer">
           <header class="explorer-brand">
             <div class="brand-mark"><BrainCircuit /></div>
@@ -176,8 +181,8 @@ function openCreateCommand() {
                 :class="{ active: workspace.activeChatSessionId.value === session.id }"
                 @click="workspace.selectChatSession(session.id)"
               >
-                <strong>{{ session.title || "Untitled chat" }}</strong>
-                <small>{{ session.message_count }} messages · {{ formatDate(session.updated_at) }}</small>
+                <strong>{{ session.title || t("ai.untitledChat") }}</strong>
+                <small>{{ t("ai.messageCount", { count: session.message_count }) }} · {{ formatDate(session.updated_at) }}</small>
               </button>
             </section>
             <section v-else-if="workspace.view.value === 'notes' || workspace.view.value === 'graph'" data-testid="sidebar-group-context-files">
@@ -192,7 +197,7 @@ function openCreateCommand() {
               </button>
             </section>
             <section data-testid="sidebar-group-vaults">
-              <header><span>{{ t("shell.researchSpaces") }}</span><UiIconButton label="Create vault" size="sm" @click="openCreateCommand"><Plus /></UiIconButton></header>
+              <header><span>{{ t("shell.researchSpaces") }}</span><UiIconButton :label="t('shell.createVault')" size="sm" @click="openCreateCommand"><Plus /></UiIconButton></header>
               <button v-for="vault in workspace.knowledgeBases.value" :key="vault.id" :class="{ active: workspace.selectedKnowledgeBaseId.value === vault.id }" @click="workspace.selectKnowledgeBase(vault.id)">
                 <strong>{{ vault.name }}</strong><small>{{ vault.description || t("shell.noDescription") }}</small>
               </button>
@@ -213,22 +218,23 @@ function openCreateCommand() {
 
       <section class="mneme-shell__main">
         <WorkspaceToolbar
-          v-if="workspace.view.value !== 'graph'"
           v-model:notifications-open="workspace.notificationPanelOpen.value"
           :title="currentViewItem.label"
           :hint="currentViewItem.hint"
           :context="toolbarContext"
           :health-label="activeHealthLabel"
           :notification-count="workspace.notificationUnreadCount.value"
-          :compact="workspace.view.value === 'ai'"
+          :compact="workspace.view.value === 'ai' || workspace.view.value === 'graph'"
+          :overlay="workspace.view.value === 'graph'"
+          :show-resource-toggle="!viewOwnsResourceSidebar"
           @toggle-resources="shell.toggleResource"
           @refresh="workspace.loadKnowledgeBasePanels"
           @logout="workspace.logout"
         >
           <template #notifications>
-            <section data-testid="notification-center-panel" class="notification-panel" aria-label="Notifications">
-              <header><strong>Notifications</strong><button type="button" @click="workspace.refreshNotifications">Refresh</button></header>
-              <p v-if="!workspace.notifications.value.length" class="notification-empty">You are all caught up.</p>
+            <section data-testid="notification-center-panel" class="notification-panel" :aria-label="t('shell.notifications')">
+              <header><strong>{{ t("shell.notifications") }}</strong><button type="button" @click="workspace.refreshNotifications">{{ t("shell.refresh") }}</button></header>
+              <p v-if="!workspace.notifications.value.length" class="notification-empty">{{ t("shell.notificationsEmpty") }}</p>
               <button
                 v-for="notification in workspace.notifications.value"
                 :key="notification.id"
@@ -251,9 +257,9 @@ function openCreateCommand() {
           v-if="workspace.duplicateUpload.value"
           data-testid="duplicate-upload-notice"
           class="workspace-banner"
-          :title="`${workspace.duplicateUpload.value.file_name} already exists`"
+          :title="t('reader.duplicateUpload', { name: workspace.duplicateUpload.value.file_name })"
         >
-          <template #action><button type="button" @click="workspace.openDuplicateUpload">Open existing file</button></template>
+          <template #action><button type="button" @click="workspace.openDuplicateUpload">{{ t("reader.openExisting") }}</button></template>
         </UiStatusPanel>
 
         <section data-testid="obsidian-editor-pane" class="workspace-content">
@@ -261,7 +267,7 @@ function openCreateCommand() {
             v-if="workspace.isLoading.value || activeViewLoading"
             class="workspace-loading"
             :class="{ 'workspace-loading--dashboard': workspace.view.value === 'dashboard' }"
-            aria-label="Loading workspace"
+            :aria-label="t('shell.loadingWorkspace')"
           >
             <template v-if="workspace.view.value === 'dashboard'">
               <div class="workspace-loading__hero">
@@ -292,6 +298,7 @@ function openCreateCommand() {
         :items="primaryNavigationItems"
         :active-id="workspace.view.value"
         :more-active="moreNavigationActive"
+        :more-open="shell.moreOpen.value"
         @open-more="shell.openMore"
         @navigate="navigate"
       />
@@ -375,6 +382,11 @@ function openCreateCommand() {
 .user-card strong { font-size: 0.75rem; }
 .user-card small { color: var(--text-tertiary); font-size: 0.64rem; }
 .workspace-banner { width: 100%; min-width: 0; flex: 0 0 auto; margin: 0; padding: 0.55rem 1rem; color: var(--text-secondary); background: var(--accent-soft); border-width: 0 0 1px; border-radius: 0; font-size: 0.72rem; }
+.workspace-toolbar--overlay + .workspace-banner { margin-top: 3.25rem; }
+
+@media (max-width: 767px) {
+  .workspace-toolbar--overlay + .workspace-banner { margin-top: 3.5rem; }
+}
 .workspace-content { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
 .notification-panel { width: min(22rem, calc(100vw - 2rem)); max-height: min(31rem, calc(100vh - 5rem)); overflow: auto; }
 .notification-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 0.45rem 0.55rem 0.6rem; border-bottom: 1px solid var(--border-muted); }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Bell, LogOut, PanelLeft, RefreshCw } from "@lucide/vue";
+import { useI18n } from "../../composables/useI18n";
 import UiIconButton from "../ui/UiIconButton.vue";
 import UiPopover from "../ui/UiPopover.vue";
 
@@ -10,13 +11,18 @@ withDefaults(defineProps<{
   healthLabel?: string;
   notificationCount?: number;
   compact?: boolean;
+  showResourceToggle?: boolean;
+  overlay?: boolean;
 }>(), {
   context: "",
   healthLabel: "",
   notificationCount: 0,
   compact: false,
+  showResourceToggle: true,
+  overlay: false,
 });
 
+const { t } = useI18n();
 const notificationsOpen = defineModel<boolean>("notificationsOpen", { default: false });
 const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
 </script>
@@ -25,13 +31,14 @@ const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
   <header
     data-testid="sanctuary-topbar"
     class="workspace-toolbar"
-    :class="{ 'workspace-toolbar--compact': compact }"
+    :class="{ 'workspace-toolbar--compact': compact, 'workspace-toolbar--overlay': overlay }"
   >
     <div class="workspace-toolbar__leading">
       <UiIconButton
+        v-if="showResourceToggle"
         class="workspace-toolbar__resource-toggle"
-        label="Open resources"
-        tooltip="Resources"
+        :label="t('shell.openResources')"
+        :tooltip="t('shell.resources')"
         @click="emit('toggleResources')"
       ><PanelLeft /></UiIconButton>
       <div data-testid="sanctuary-active-view" class="workspace-toolbar__title">
@@ -43,14 +50,14 @@ const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
     <div class="workspace-toolbar__actions">
       <slot name="actions" />
       <span v-if="healthLabel" class="workspace-toolbar__health">{{ healthLabel }}</span>
-      <UiIconButton class="workspace-toolbar__desktop-action" label="Refresh panels" tooltip="Refresh" @click="emit('refresh')"><RefreshCw /></UiIconButton>
-      <UiPopover v-model="notificationsOpen" align="end" aria-label="Notifications">
+      <UiIconButton class="workspace-toolbar__desktop-action" :label="t('shell.refreshPanels')" :tooltip="t('shell.refresh')" @click="emit('refresh')"><RefreshCw /></UiIconButton>
+      <UiPopover v-model="notificationsOpen" align="end" :aria-label="t('shell.notifications')">
         <template #trigger="{ props: triggerProps }">
           <UiIconButton
             v-bind="triggerProps"
             data-testid="notification-center-toggle"
-            :label="notificationCount ? `${notificationCount} unread notifications` : 'Notifications'"
-            tooltip="Notifications"
+            :label="notificationCount ? t('shell.unreadNotifications', { count: notificationCount }) : t('shell.notifications')"
+            :tooltip="t('shell.notifications')"
           >
             <Bell />
             <span v-if="notificationCount" class="workspace-toolbar__badge">{{ notificationCount > 9 ? "9+" : notificationCount }}</span>
@@ -58,7 +65,7 @@ const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
         </template>
         <slot name="notifications" />
       </UiPopover>
-      <UiIconButton class="workspace-toolbar__desktop-action" label="Log out" tooltip="Log out" @click="emit('logout')"><LogOut /></UiIconButton>
+      <UiIconButton class="workspace-toolbar__desktop-action" :label="t('shell.logout')" :tooltip="t('shell.logout')" @click="emit('logout')"><LogOut /></UiIconButton>
     </div>
   </header>
 </template>
@@ -78,6 +85,7 @@ const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
   border-bottom: 1px solid var(--stroke-subtle);
 }
 .workspace-toolbar--compact { min-height: 3.25rem; }
+.workspace-toolbar--overlay { position: absolute; inset: 0 0 auto; background: linear-gradient(to bottom, var(--surface-canvas) 72%, transparent); }
 .workspace-toolbar__leading,
 .workspace-toolbar__actions,
 .workspace-toolbar__title > div {
@@ -136,7 +144,7 @@ const emit = defineEmits<{ toggleResources: []; refresh: []; logout: [] }>();
 .workspace-toolbar :deep(.ui-icon-button svg) { width: 1rem; height: 1rem; }
 .workspace-toolbar__resource-toggle { display: none; }
 
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   .workspace-toolbar__resource-toggle { display: inline-grid; }
 }
 @media (max-width: 767px) {

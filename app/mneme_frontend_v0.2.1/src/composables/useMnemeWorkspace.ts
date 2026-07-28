@@ -130,9 +130,9 @@ export function useMnemeWorkspace() {
   const loginForm = ref({ username: "", password: "" });
   const registerForm = ref({ username: "", displayName: "", password: "", confirmPassword: "" });
   const knowledgeBaseForm = ref({ name: "", description: "" });
-  const chatQuestion = ref("How should I review this vault?");
-  const companionQuestion = ref("What should I focus on next?");
-  const adviceGoal = ref("Improve retrieval quality");
+  const chatQuestion = ref(t("ai.previewQuestion"));
+  const companionQuestion = ref(t("dashboard.previewCompanionQuestion"));
+  const adviceGoal = ref(t("dashboard.previewAdviceGoal"));
 
   const selectedKnowledgeBase = computed(
     () => knowledgeBases.value.find((item) => item.id === selectedKnowledgeBaseId.value) ?? knowledgeBases.value[0] ?? null,
@@ -148,7 +148,7 @@ export function useMnemeWorkspace() {
     if (!query) {
       return chatSessions.value;
     }
-    return chatSessions.value.filter((session) => (session.title || "Untitled Chat").toLowerCase().includes(query));
+    return chatSessions.value.filter((session) => (session.title || t("ai.untitledChat")).toLowerCase().includes(query));
   });
 
   const workspaceLoaders = useWorkspaceLoaders({
@@ -329,7 +329,7 @@ export function useMnemeWorkspace() {
       void loadWorkspace();
     } catch (error) {
       authStatus.value = "guest";
-      authError.value = errorMessage(error, "Session expired. Please sign in again.");
+      authError.value = errorMessage(error, t("auth.sessionExpired"));
       token.value = "";
       safeStorageRemove(TOKEN_KEY);
     }
@@ -399,7 +399,7 @@ export function useMnemeWorkspace() {
     knowledgeBases.value = [...knowledgeBases.value, created];
     selectedKnowledgeBaseId.value = created.id;
     knowledgeBaseForm.value = { name: "", description: "" };
-    banner.value = `Created ${created.name}`;
+    banner.value = t("vault.created", { name: created.name });
     await loadKnowledgeBasePanels();
   }
 
@@ -423,7 +423,10 @@ export function useMnemeWorkspace() {
       user.value?.id ?? null,
       documentWorkspace.selectedFolderId.value || null,
     );
-    banner.value = result.disposition === "duplicate" ? `${result.file_name} already exists` : `Uploaded ${result.file_name}`;
+    banner.value = t(
+      result.disposition === "duplicate" ? "reader.duplicateUpload" : "reader.uploaded",
+      { name: result.file_name },
+    );
     uploadInputKey.value += 1;
     if (result.disposition === "created") await ensureViewLoaded("notes", true);
   }
@@ -467,7 +470,7 @@ export function useMnemeWorkspace() {
   }
 
   async function waitForMaintenanceTask(taskId: string) {
-    if (!token.value) throw new Error("Authentication is required to monitor this task.");
+    if (!token.value) throw new Error(t("task.authenticationRequired"));
     const controller = new AbortController();
     maintenanceTaskMonitors.add(controller);
     const maximumPolls = IS_PREVIEW_MODE ? 2 : 240;
@@ -478,11 +481,11 @@ export function useMnemeWorkspace() {
         const status = normalizedTaskStatus(task.status);
         if (status === "succeeded") return task;
         if (status === "failed" || status === "cancelled") {
-          throw new Error(task.error_message || `Maintenance task ${status}.`);
+          throw new Error(task.error_message || t("task.maintenanceStatus", { status }));
         }
         await pollDelay(interval, controller.signal);
       }
-      throw new Error("Maintenance task is still running. Check the task status later.");
+      throw new Error(t("task.stillRunning"));
     } finally {
       maintenanceTaskMonitors.delete(controller);
     }
@@ -499,7 +502,7 @@ export function useMnemeWorkspace() {
         const task = await api.getTask(taskId, token.value, { signal: controller.signal });
         const status = normalizedTaskStatus(task.status);
         if (status === "succeeded") {
-          documentActionStatus.value = "Indexing completed";
+          documentActionStatus.value = t("reader.indexCompleted");
           workspaceLoaders.invalidate();
           await ensureViewLoaded(view.value, true);
           if (documentWorkspace.activeDocumentId.value) {
@@ -509,15 +512,15 @@ export function useMnemeWorkspace() {
         }
         if (status === "failed" || status === "cancelled") {
           const detail = task.error_message || task.result_summary || status;
-          documentActionStatus.value = `Indexing ${status}: ${detail}`;
+          documentActionStatus.value = t("reader.indexFailed", { status, detail });
           return;
         }
         await pollDelay(interval, controller.signal);
       }
-      documentActionStatus.value = "Indexing is still running. Refresh to check again.";
+      documentActionStatus.value = t("reader.indexStillRunning");
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError")) {
-        documentActionStatus.value = errorMessage(error, "Unable to monitor indexing status.");
+        documentActionStatus.value = errorMessage(error, t("reader.indexMonitorFailed"));
       }
     } finally {
       if (indexTaskMonitors.get(taskId) === controller) indexTaskMonitors.delete(taskId);
@@ -535,7 +538,7 @@ export function useMnemeWorkspace() {
     }
 
     const result = await api.deleteDocument(documentId, token.value);
-    documentActionStatus.value = `Deleted ${result.document_id}`;
+    documentActionStatus.value = t("reader.deleted", { id: result.document_id });
     documentWorkspace.closeDocument(documentId);
     workspaceLoaders.invalidate();
     await ensureViewLoaded(view.value, true);
@@ -607,7 +610,7 @@ export function useMnemeWorkspace() {
     if (chatAnswerMode.value !== "general_chat" && !knowledgeBaseId) return;
     const session = await api.createChatSession(token.value, {
       knowledge_base_id: knowledgeBaseId,
-      title: "New Chat",
+      title: t("ai.newChat"),
       answer_mode: chatAnswerMode.value,
       multi_agent_enabled: chatMultiAgentEnabled.value,
     });
@@ -622,7 +625,7 @@ export function useMnemeWorkspace() {
     }
 
     await api.deleteChatSession(token.value, activeChatSessionId.value);
-    banner.value = "Chat session deleted";
+    banner.value = t("ai.chatDeleted");
     await loadChatSessions();
   }
 
@@ -698,13 +701,13 @@ export function useMnemeWorkspace() {
               message.id === pendingAssistantId ? { ...message, content: message.content + event.content } : message,
             );
           } else if (event.name === "retrieval.started") {
-            chatRunProgress.value = "Searching memory and document evidence…";
-            recordRunTrace(event, "Retrieval started", "active");
+            chatRunProgress.value = t("ai.progress.searchingEvidence");
+            recordRunTrace(event, t("ai.trace.retrievalStarted"), "active");
           } else if (event.name === "retrieval.source_completed") {
             const source = String(event.metadata?.source_type ?? "source");
             const count = Number(event.metadata?.result_count ?? 0);
-            chatRunProgress.value = `${source} retrieval completed (${count} items)`;
-            recordRunTrace(event, `${source} · ${count} results`);
+            chatRunProgress.value = t("ai.progress.retrievalCompleted", { source, count });
+            recordRunTrace(event, t("ai.trace.results", { source, count }));
           } else if (event.name === "evidence.selected") {
             const count = Number(event.metadata?.evidence_count ?? 0);
             const sourceCounts = event.metadata?.source_counts;
@@ -717,54 +720,56 @@ export function useMnemeWorkspace() {
                 : "";
             chatRunProgress.value =
               count > 0
-                ? `Selected ${count} evidence items${sourceSummary ? ` (${sourceSummary})` : ""}`
-                : "No supporting evidence selected";
-            recordRunTrace(event, count > 0 ? `${count} evidence items selected` : "No evidence selected", count > 0 ? "complete" : "warning");
+                ? t("ai.progress.evidenceSelected", { count, summary: sourceSummary ? ` (${sourceSummary})` : "" })
+                : t("ai.progress.noSupportingEvidence");
+            recordRunTrace(event, count > 0 ? t("ai.trace.evidenceSelected", { count }) : t("ai.trace.noEvidence"), count > 0 ? "complete" : "warning");
           } else if (event.name === "answer.started") {
-            chatRunProgress.value = "Composing an evidence-backed answer…";
-            recordRunTrace(event, "Answer generation started", "active");
+            chatRunProgress.value = t("ai.progress.composingEvidenceAnswer");
+            recordRunTrace(event, t("ai.trace.answerStarted"), "active");
           } else if (event.name === "multi_agent.coordinator.completed") {
             const count = Number(event.metadata?.source_count ?? 0);
-            chatRunProgress.value = `Coordinator assigned ${count} retrieval roles`;
-            recordRunTrace(event, `Coordinator · ${count} sources`);
+            chatRunProgress.value = t("ai.progress.coordinatorAssigned", { count });
+            recordRunTrace(event, t("ai.trace.coordinatorSources", { count }));
           } else if (event.name === "multi_agent.role.started") {
             const role = event.agent_role || String(event.metadata?.source_type ?? "retriever");
-            chatRunProgress.value = `${role} is retrieving evidence…`;
-            recordRunTrace(event, `${role} started`, "active");
+            chatRunProgress.value = t("ai.progress.roleRetrieving", { role });
+            recordRunTrace(event, t("ai.trace.roleStarted", { role }), "active");
           } else if (event.name === "multi_agent.role.completed") {
             const role = event.agent_role || String(event.metadata?.source_type ?? "retriever");
             const count = Number(event.metadata?.result_count ?? 0);
-            recordRunTrace(event, `${role} · ${count} results`);
+            recordRunTrace(event, t("ai.trace.roleResults", { role, count }));
           } else if (event.name === "multi_agent.role.failed") {
             const role = event.agent_role || String(event.metadata?.source_type ?? "retriever");
-            recordRunTrace(event, `${role} unavailable · degraded`, "warning");
+            recordRunTrace(event, t("ai.trace.roleUnavailable", { role }), "warning");
           } else if (event.name === "multi_agent.judge.completed") {
             const kept = Number(event.metadata?.kept_count ?? 0);
             const conflicts = Number(event.metadata?.conflict_count ?? 0);
-            chatRunProgress.value = `Evidence Judge kept ${kept} items`;
-            recordRunTrace(event, `Evidence Judge · ${kept} kept${conflicts ? ` · ${conflicts} conflicts` : ""}`);
+            chatRunProgress.value = t("ai.progress.evidenceJudgeKept", { count: kept });
+            recordRunTrace(event, t("ai.trace.evidenceJudge", { kept, conflicts: conflicts ? t("ai.trace.conflicts", { count: conflicts }) : "" }));
           } else if (event.name === "citation.resolved") {
-            chatRunProgress.value = "Checking citations…";
-            recordRunTrace(event, "Citations resolved");
+            chatRunProgress.value = t("ai.progress.checkingCitations");
+            recordRunTrace(event, t("ai.trace.citationsResolved"));
           } else if (event.name === "answer.completed") {
-            chatRunProgress.value = "Answer completed";
-            recordRunTrace(event, "Answer completed");
+            chatRunProgress.value = t("ai.progress.answerCompleted");
+            recordRunTrace(event, t("ai.progress.answerCompleted"));
             chatStreamState.value = "completed";
           } else if (event.name === "run.cancelled") {
-            chatRunProgress.value = "Cancelled";
-            recordRunTrace(event, "Run cancelled", "warning");
+            chatRunProgress.value = t("ai.progress.cancelled");
+            recordRunTrace(event, t("ai.trace.runCancelled"), "warning");
             chatStreamState.value = "cancelled";
           } else if (event.name === "run.queued") {
-            recordRunTrace(event, "Run queued", "active");
+            recordRunTrace(event, t("ai.trace.runQueued"), "active");
           } else if (event.name === "run.started") {
-            recordRunTrace(event, "Run started", "active");
+            recordRunTrace(event, t("ai.trace.runStarted"), "active");
           } else if (event.name === "query.rewritten") {
-            recordRunTrace(event, "Query normalized");
+            recordRunTrace(event, t("ai.trace.queryNormalized"));
           } else if (event.name === "run.failed") {
-            recordRunTrace(event, event.error || "Run failed", "warning");
+            recordRunTrace(event, event.error || t("ai.trace.runFailed"), "warning");
             chatStreamState.value = "failed";
           } else if (event.type === "tool" && event.tool) {
-            banner.value = event.phase === "start" ? `Running ${event.tool}...` : `${event.tool} completed`;
+            banner.value = t(event.phase === "start" ? "ai.toolRunning" : "ai.toolCompleted", {
+              tool: event.tool,
+            });
           } else if (event.type === "error" && event.error) {
             banner.value = event.error;
           }
@@ -779,8 +784,8 @@ export function useMnemeWorkspace() {
             globalThis.crypto?.randomUUID?.() ?? `request-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         });
         activeChatRunId.value = run.run_id;
-        chatRunProgress.value = "Queued";
-        recordRunTrace({ type: "lifecycle", name: "run.queued", run_id: run.run_id }, "Run queued", "active");
+        chatRunProgress.value = t("ai.progress.queued");
+        recordRunTrace({ type: "lifecycle", name: "run.queued", run_id: run.run_id }, t("ai.trace.runQueued"), "active");
         const controller = new AbortController();
         activeChatController = controller;
         await api.streamAgentRun(token.value, run.run_id, handleEvent, {
@@ -788,9 +793,9 @@ export function useMnemeWorkspace() {
           onConnectionState: (state, attempt) => {
             chatStreamState.value = state;
             if (state === "reconnecting") {
-              chatRunProgress.value = `Connection interrupted · reconnecting (${attempt}/3)…`;
+              chatRunProgress.value = t("ai.progress.reconnecting", { attempt });
             } else if (state === "streaming") {
-              chatRunProgress.value = attempt > 0 ? "Stream resumed" : "Live stream connected";
+              chatRunProgress.value = attempt > 0 ? t("ai.progress.streamResumed") : t("ai.progress.streamConnected");
             }
           },
         });
@@ -818,7 +823,7 @@ export function useMnemeWorkspace() {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         chatError.value = null;
-        banner.value = "Agent run cancelled";
+        banner.value = t("ai.runCancelled");
         chatStreamState.value = "cancelled";
         const detail = await api.getChatSession(token.value, activeChatSessionId.value);
         chatMessages.value = detail.messages;
@@ -826,7 +831,7 @@ export function useMnemeWorkspace() {
       }
       const data = error instanceof ApiError && error.data && typeof error.data === "object" ? error.data as Record<string, unknown> : {};
       chatStreamState.value = "failed";
-      chatError.value = { message: errorMessage(error, "Unable to answer."), messageId: typeof data.message_id === "string" ? data.message_id : null, retryable: data.retryable === true };
+      chatError.value = { message: errorMessage(error, t("ai.answerFailed")), messageId: typeof data.message_id === "string" ? data.message_id : null, retryable: data.retryable === true };
       const detail = await api.getChatSession(token.value, activeChatSessionId.value);
       mergeChatMessages(detail.messages);
     } finally {
@@ -842,13 +847,13 @@ export function useMnemeWorkspace() {
   async function cancelActiveChatRun() {
     const runId = controlledChatRunId.value || activeChatRunId.value;
     if (!token.value || !runId) return;
-    chatRunProgress.value = "Cancelling…";
+    chatRunProgress.value = t("ai.progress.cancelling");
     try {
       await api.controlAgentRun(token.value, runId, { mode: "interrupt" });
       controlledChatController?.abort();
       activeChatController?.abort();
     } catch (error) {
-      banner.value = errorMessage(error, "Unable to cancel the agent run.");
+      banner.value = errorMessage(error, t("ai.cancelFailed"));
     }
   }
 
@@ -919,8 +924,8 @@ export function useMnemeWorkspace() {
       ];
       chatRunProgress.value =
         result.behavior === "restart_with_updated_direction"
-          ? "Updating direction and restarting…"
-          : "Follow-up queued…";
+          ? t("ai.progress.updatingDirection")
+          : t("ai.progress.followupQueued");
       recordRunTrace(
         {
           type: "lifecycle",
@@ -931,7 +936,7 @@ export function useMnemeWorkspace() {
             scheduled_run_id: scheduled.run_id,
           },
         },
-        result.mode === "steer" ? "Direction updated · restarting" : "Follow-up queued",
+        result.mode === "steer" ? t("ai.trace.directionUpdated") : t("ai.trace.followupQueued"),
         "active",
       );
       if (result.mode === "steer") activeChatController?.abort();
@@ -950,23 +955,23 @@ export function useMnemeWorkspace() {
             );
           } else if (event.name === "context.compacted") {
             const count = Number(event.metadata?.compacted_messages ?? 0);
-            chatRunProgress.value = `Context compacted (${count} messages)`;
-            recordRunTrace(event, `Context compacted · ${count} messages`);
+            chatRunProgress.value = t("ai.progress.contextCompacted", { count });
+            recordRunTrace(event, t("ai.trace.contextCompacted", { count }));
           } else if (event.name === "run.started") {
-            chatRunProgress.value = "Controlled run started";
-            recordRunTrace(event, "Controlled run started", "active");
+            chatRunProgress.value = t("ai.progress.controlledRunStarted");
+            recordRunTrace(event, t("ai.progress.controlledRunStarted"), "active");
           } else if (event.name === "answer.started") {
-            chatRunProgress.value = "Composing the updated answer…";
-            recordRunTrace(event, "Updated answer generation started", "active");
+            chatRunProgress.value = t("ai.progress.composingUpdatedAnswer");
+            recordRunTrace(event, t("ai.trace.updatedAnswerStarted"), "active");
           } else if (event.name === "answer.completed") {
-            chatRunProgress.value = "Controlled run completed";
-            recordRunTrace(event, "Controlled run completed");
+            chatRunProgress.value = t("ai.progress.controlledRunCompleted");
+            recordRunTrace(event, t("ai.progress.controlledRunCompleted"));
             chatStreamState.value = "completed";
           } else if (event.name === "run.cancelled") {
-            chatRunProgress.value = "Cancelled";
-            recordRunTrace(event, "Controlled run cancelled", "warning");
+            chatRunProgress.value = t("ai.progress.cancelled");
+            recordRunTrace(event, t("ai.trace.controlledRunCancelled"), "warning");
           } else if (event.name === "run.failed") {
-            chatRunProgress.value = event.error || "Controlled run failed";
+            chatRunProgress.value = event.error || t("ai.progress.controlledRunFailed");
             recordRunTrace(event, chatRunProgress.value, "warning");
           }
         },
@@ -983,7 +988,7 @@ export function useMnemeWorkspace() {
       chatSessions.value = sessions.items;
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError")) {
-        banner.value = errorMessage(error, "Unable to control the active agent run.");
+        banner.value = errorMessage(error, t("ai.controlFailed"));
       }
     } finally {
       chatControlPending.value = false;
@@ -1010,7 +1015,7 @@ export function useMnemeWorkspace() {
   async function selectChatAnswerMode(mode: AnswerMode) {
     if (!token.value || !activeChatSessionId.value) {
       if (mode !== "general_chat" && !activeKnowledgeBaseId.value) {
-        banner.value = "Choose a knowledge base before using a private answer mode.";
+        banner.value = t("ai.chooseKnowledgeBase");
         return;
       }
       chatAnswerMode.value = mode;
@@ -1019,7 +1024,7 @@ export function useMnemeWorkspace() {
     }
     const session = chatSessions.value.find((item) => item.id === activeChatSessionId.value);
     if (mode !== "general_chat" && !session?.knowledge_base_id) {
-      banner.value = "This chat has no knowledge base. Keep General chat or create a scoped chat.";
+      banner.value = t("ai.unscopedChat");
       return;
     }
     const updated = await api.updateChatSession(token.value, activeChatSessionId.value, { answer_mode: mode });
@@ -1047,7 +1052,7 @@ export function useMnemeWorkspace() {
       );
     } catch (error) {
       chatMultiAgentEnabled.value = previous;
-      banner.value = errorMessage(error, "Unable to update Multi-Agent preference.");
+      banner.value = errorMessage(error, t("ai.multiAgentUpdateFailed"));
     }
   }
 
@@ -1075,9 +1080,9 @@ export function useMnemeWorkspace() {
       channelIdentities.value = identities;
       channelConversations.value = conversations;
       channelDeliveries.value = deliveries;
-      channelActionStatus.value = "Channel state refreshed";
+      channelActionStatus.value = t("channel.statusRefreshed");
     } catch (error) {
-      channelActionStatus.value = errorMessage(error, "Unable to refresh channel state.");
+      channelActionStatus.value = errorMessage(error, t("channel.refreshFailed"));
     } finally {
       channelPending.value = false;
     }
@@ -1092,9 +1097,9 @@ export function useMnemeWorkspace() {
         token.value,
         channelConfiguration.value.account_id,
       );
-      channelActionStatus.value = "Binding command generated";
+      channelActionStatus.value = t("channel.bindingGenerated");
     } catch (error) {
-      channelActionStatus.value = errorMessage(error, "Unable to create a binding code.");
+      channelActionStatus.value = errorMessage(error, t("channel.bindingFailed"));
     } finally {
       channelPending.value = false;
     }
@@ -1119,9 +1124,9 @@ export function useMnemeWorkspace() {
       channelConversations.value = channelConversations.value.map((item) =>
         item.id === updated.id ? updated : item,
       );
-      channelActionStatus.value = "Conversation route saved";
+      channelActionStatus.value = t("channel.routeSaved");
     } catch (error) {
-      channelActionStatus.value = errorMessage(error, "Unable to save the conversation route.");
+      channelActionStatus.value = errorMessage(error, t("channel.routeSaveFailed"));
     } finally {
       channelPending.value = false;
     }
@@ -1135,9 +1140,9 @@ export function useMnemeWorkspace() {
       channelDeliveries.value = channelDeliveries.value.map((item) =>
         item.id === updated.id ? updated : item,
       );
-      channelActionStatus.value = "Delivery queued for retry";
+      channelActionStatus.value = t("channel.deliveryRetryQueued");
     } catch (error) {
-      channelActionStatus.value = errorMessage(error, "Unable to retry the delivery.");
+      channelActionStatus.value = errorMessage(error, t("channel.deliveryRetryFailed"));
     } finally {
       channelPending.value = false;
     }
@@ -1159,6 +1164,7 @@ export function useMnemeWorkspace() {
     }
 
     const result = await api.testAiModelConfig(token.value, configId);
+    if (!result.ok) throw new Error(result.message || t("settings.modelTestFailed"));
     aiModelActionStatus.value = result.message;
   }
 
@@ -1170,7 +1176,7 @@ export function useMnemeWorkspace() {
     const updated = await api.setDefaultAiModelConfig(token.value, configId);
     aiModelConfigs.value = aiModelConfigs.value.map((config) => ({ ...config, is_default: config.id === updated.id }));
     activeAiModelConfigId.value = updated.id;
-    aiModelActionStatus.value = `${updated.label} is now default`;
+    aiModelActionStatus.value = t("settings.modelDefaultUpdated", { name: updated.label });
   }
 
   async function updateActiveModelContextWindow(value: number) {
@@ -1182,7 +1188,7 @@ export function useMnemeWorkspace() {
       context_window: value,
     });
     aiModelConfigs.value = aiModelConfigs.value.map((config) => (config.id === updated.id ? updated : config));
-    aiModelActionStatus.value = `Context window updated to ${updated.context_window.toLocaleString()}`;
+    aiModelActionStatus.value = t("settings.contextWindowUpdated", { value: updated.context_window.toLocaleString() });
   }
 
   async function loadDocumentPreview(documentId: string) {
@@ -1209,9 +1215,9 @@ export function useMnemeWorkspace() {
     syncBusyTarget.value = "graph";
     try {
       const result = await api.rebuildKnowledgeBaseGraph(token.value, activeKnowledgeBaseId.value);
-      syncStatus.value = `Graph rebuild queued for ${selectedKnowledgeBase.value?.name ?? activeKnowledgeBaseId.value}`;
+      syncStatus.value = t("settings.graphRebuildQueued", { name: selectedKnowledgeBase.value?.name ?? activeKnowledgeBaseId.value });
       await waitForMaintenanceTask(result.id);
-      syncStatus.value = `Graph rebuild completed for ${selectedKnowledgeBase.value?.name ?? activeKnowledgeBaseId.value}`;
+      syncStatus.value = t("settings.graphRebuildCompleted", { name: selectedKnowledgeBase.value?.name ?? activeKnowledgeBaseId.value });
       graphData.value = await api.getKnowledgeBaseGraph(token.value, activeKnowledgeBaseId.value, {
         include_memory: true,
         include_relationships: true,
@@ -1228,9 +1234,9 @@ export function useMnemeWorkspace() {
     syncBusyTarget.value = "memory";
     try {
       const result = await api.rebuildMemory(token.value, activeKnowledgeBaseId.value);
-      syncStatus.value = "Memory rebuild queued";
+      syncStatus.value = t("settings.memoryRebuildQueued");
       const task = await waitForMaintenanceTask(result.id);
-      syncStatus.value = task.result_summary || "Memory rebuild completed";
+      syncStatus.value = task.result_summary || t("settings.memoryRebuildCompleted");
       memoryLibrary.value = await api.memoryLibrary(token.value, activeKnowledgeBaseId.value);
       memoryGovernance.value = await api.memoryGovernance(token.value, activeKnowledgeBaseId.value);
     } finally {

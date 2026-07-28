@@ -232,27 +232,27 @@ Expected: 三条命令退出码均为 0；主题切换、Tailwind 工具类和�
 - Create: `app/mneme_frontend_v0.2.1/src/components/shell/MoreNavigationSheet.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/composables/useResponsiveShell.ts`
 
-- [ ] **Step 1: 将顶栏与通知整合进 `WorkspaceToolbar`**
+- [x] **Step 1: 将顶栏与通知整合进 `WorkspaceToolbar`**
 
 Toolbar 固定包含当前视图标题、知识库上下文、页面级 action slot、通知和用户菜单。Graph、AI 不再通过条件绕过顶栏，而是提供 compact/overlay 变体，避免页面各自发明顶部结构。
 
-- [ ] **Step 2: 让资源栏内容随视图变化**
+- [x] **Step 2: 让资源栏内容随视图变化**
 
 Dashboard/Settings 展示知识库概览，Vault 展示文档树，Graph 展示节点与文档过滤，AI 展示会话历史；桌面宽度使用 264px，平板和移动改为 overlay drawer。
 
-- [ ] **Step 3: 改造移动端入口优先级**
+- [x] **Step 3: 改造移动端入口优先级**
 
 底栏固定为 `Home / Vault / Graph / AI / More` 五项，Files 成为 Vault/Graph/AI 标题栏的上下文按钮；More sheet 提供 Memory、Settings、主题、帮助和退出。
 
-- [ ] **Step 4: 完成抽屉细节**
+- [x] **Step 4: 完成抽屉细节**
 
 资源抽屉进入 220ms、退出 160ms，遮罩同步透明度；支持 Escape、点击遮罩、焦点返回和 safe-area。抽屉关闭时使用 `inert`/不可聚焦状态，不能只靠 `aria-hidden`。
 
-- [ ] **Step 5: 统一低优先级状态**
+- [x] **Step 5: 统一低优先级状态**
 
 StatusBar 仅在桌面显示连接、索引、当前知识库等低优先级信息；移动端将异常状态提升为可操作 status panel，避免占用固定高度。
 
-- [ ] **Step 6: 响应式验收**
+- [x] **Step 6: 响应式验收**
 
 分别检查 1440×900、1024×768、768×1024、390×844、360×800；Expected: 无主页面横向滚动、通知不覆盖标题、资源抽屉不永久挤压内容、底栏文字完整。
 
@@ -263,23 +263,23 @@ StatusBar 仅在桌面显示连接、索引、当前知识库等低优先级信�
 - Modify: `app/mneme_frontend_v0.2.1/src/views/DashboardView.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/i18n/messages.ts`
 
-- [ ] **Step 1: 登录页采用双区但克制的构图**
+- [x] **Step 1: 登录页采用双区但克制的构图**
 
 桌面端左侧为品牌价值与三个能力短句，右侧为认证表单；移动端只保留紧凑品牌头和表单。背景使用微弱径向明度变化，不加入插画、粒子或循环动画。
 
-- [ ] **Step 2: Dashboard 首屏改为“继续工作”**
+- [x] **Step 2: Dashboard 首屏改为“继续工作”**
 
 标题区展示当前知识库、最近活动和一个主操作；Documents/Memories/Graph 指标改为一条紧凑概览，不使用三个等权大卡片。
 
-- [ ] **Step 3: 命令模块按用户意图分组**
+- [x] **Step 3: 命令模块按用户意图分组**
 
 默认展示“继续阅读”和“最近文件”；Create/Upload 为创建类操作，Ask/Companion 为查询类操作。桌面使用分段侧栏，移动端使用横向分段控件，保持当前提交函数不变。
 
-- [ ] **Step 4: 补齐本地化与状态**
+- [x] **Step 4: 补齐本地化与状态**
 
 将认证、Dashboard command、空状态和错误文案全部迁移到 `messages.ts`；loading 时骨架与最终布局一致，创建/提问中禁用重复提交。
 
-- [ ] **Step 5: 验证 Preview 模式**
+- [x] **Step 5: 验证 Preview 模式**
 
 Run: `npm run dev:preview`
 
@@ -295,27 +295,27 @@ Expected: 未登录流程、预览登录、创建知识库、上传入口、Ask 
 - Modify: `app/mneme_frontend_v0.2.1/src/components/documents/DocumentContent.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/components/documents/DocumentProperties.vue`
 
-- [ ] **Step 1: 明确三栏优先级**
+- [x] **Step 1: 明确三栏优先级**
 
 文档树 240px、阅读区自适应、属性面板 280px；阅读区是唯一主表面，左右栏降低背景对比。属性面板无选中文档时自动收起，不保留空白列。
 
-- [ ] **Step 2: 统一树节点交互**
+- [x] **Step 2: 统一树节点交互**
 
 选中态同时使用背景、左侧标记和字重；行操作仅在 hover/focus-within 时显示，触摸端进入单独菜单。移动/重命名菜单迁移到 `UiPopover`，来源点与触发按钮一致。
 
-- [ ] **Step 3: 重做阅读标签和文档操作**
+- [x] **Step 3: 重做阅读标签和文档操作**
 
 标签切换不播放位移动画；关闭按钮仅在 active/hover/focus 时出现。Download/Index 使用 secondary，Delete 使用 danger，并把危险操作迁移到 `UiDialog`。
 
-- [ ] **Step 4: 校准长文阅读**
+- [x] **Step 4: 校准长文阅读**
 
 正文最大行宽 72ch、行高 1.7；标题、段落、列表、引用、代码、表格、图片间距使用稳定节奏。PDF/HTML/Markdown 的加载、失败和下载替代路径保持一致。
 
-- [ ] **Step 5: 平板与移动重组**
+- [x] **Step 5: 平板与移动重组**
 
 文档树和属性改为左右 drawer；移动端顶部仅保留 Files、截断标题、Properties，文档 actions 放入 overflow menu，避免三按钮平均分配挤压。
 
-- [ ] **Step 6: Vault 验收**
+- [x] **Step 6: Vault 验收**
 
 检查文件夹创建/重命名/移动、文档拖放、标签切换、PDF 预览、Escape 关闭抽屉和焦点返回；Expected: 无业务行为变化，阅读正文不随面板开合产生不可控跳动。
 
@@ -325,23 +325,23 @@ Expected: 未登录流程、预览登录、创建知识库、上传入口、Ask 
 - Modify: `app/mneme_frontend_v0.2.1/src/views/GraphView.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/composables/useGraphInteraction.ts`（仅在呈现所需状态确实缺失时修改）
 
-- [ ] **Step 1: 合并画布工具条**
+- [x] **Step 1: 合并画布工具条**
 
 将标题、GraphRAG 搜索、过滤器和节点类型整合成一条响应式工具条；Zoom/Center/Restart 保留为右下角紧凑控件。移除画布中央的常驻操作提示，改为首次或空状态提示。
 
-- [ ] **Step 2: 详情面板改为停靠/抽屉模式**
+- [x] **Step 2: 详情面板改为停靠/抽屉模式**
 
 桌面端右侧 320px 停靠，不覆盖工具条；小屏端使用底部 sheet。打开详情时画布可选择保持尺寸或重新 center，但不得让节点落到不可见区域。
 
-- [ ] **Step 3: 强化节点状态而不制造噪声**
+- [x] **Step 3: 强化节点状态而不制造噪声**
 
 默认节点降低标签密度；hover 显示标签和关联路径，selected 使用清晰描边，neighbor 保持高于背景但低于 selected。拖拽期间禁止文字选择并保持 pointer capture。
 
-- [ ] **Step 4: 校准 Graph 动效**
+- [x] **Step 4: 校准 Graph 动效**
 
 拖拽直接跟手，筛选切换不增加出入场动画，边/节点焦点只过渡 opacity 140ms；详情面板 200ms ease-out。键盘选择和打开文档保持即时。
 
-- [ ] **Step 5: Graph 验收**
+- [x] **Step 5: Graph 验收**
 
 检查单击选择、双击打开、Space 选择、Enter 打开、拖拽、缩放、筛选、详情关闭和布局重启；Expected: 工具条与详情不相互遮挡，移动端可触达所有控制。
 
@@ -354,27 +354,27 @@ Expected: 未登录流程、预览登录、创建知识库、上传入口、Ask 
 - Create: `app/mneme_frontend_v0.2.1/src/components/ai/AgentRunTrace.vue`
 - Create: `app/mneme_frontend_v0.2.1/src/components/ai/ChatComposer.vue`
 
-- [ ] **Step 1: 以用户感知区域拆分组件**
+- [x] **Step 1: 以用户感知区域拆分组件**
 
 `AiLabView.vue` 只组合 history、message list、run trace、composer；workspace 业务方法继续由 props 注入，不在子组件创建第二份聊天状态。
 
-- [ ] **Step 2: 提升消息可读性**
+- [x] **Step 2: 提升消息可读性**
 
 消息正文最大宽度 760px；用户消息使用轻量表面，助手消息主要依赖排版而不是大气泡。来源引用折叠在消息尾部，route/mode 作为低对比元数据。
 
-- [ ] **Step 3: 降低运行轨迹噪声**
+- [x] **Step 3: 降低运行轨迹噪声**
 
 Agent trace 默认显示当前步骤和总进度，历史步骤可展开；running/success/error 同时使用图标、文本和颜色。步骤更新只做颜色/透明度变化，不 stagger 阻塞阅读。
 
-- [ ] **Step 4: 固定 Composer 的交互层级**
+- [x] **Step 4: 固定 Composer 的交互层级**
 
 Composer 位于内容底部，回答模式使用 `UiSegmentedControl`，多 Agent 为明确的开关与说明，Send/Stop/Retry 互斥。发送后立即清空输入并展示运行状态，不等待动画。
 
-- [ ] **Step 5: 移动端拆分历史与聊天**
+- [x] **Step 5: 移动端拆分历史与聊天**
 
 会话历史进入全屏 drawer；正文与 Composer 占满宽度，键盘弹起时 Composer 不被底栏覆盖，并使用 safe-area padding。
 
-- [ ] **Step 6: AI 验收**
+- [x] **Step 6: AI 验收**
 
 检查新建/搜索/切换/删除会话、四种回答模式、多 Agent、发送、停止、重试、来源展开和流式状态；Expected: 所有现有 workspace 方法保持原调用路径。
 
@@ -386,19 +386,19 @@ Composer 位于内容底部，回答模式使用 `UiSegmentedControl`，多 Agen
 - Modify: `app/mneme_frontend_v0.2.1/src/components/memory/MemoryList.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/components/memory/MemoryDetail.vue`
 
-- [ ] **Step 1: 将页面分成审核队列、记忆库、详情三个明确区域**
+- [x] **Step 1: 将页面分成审核队列、记忆库、详情三个明确区域**
 
 pending 数量作为审核队列 badge，不放在大标题内；没有候选项时收起审核区。桌面采用列表 + 详情，移动端列表和详情改为导航式切换。
 
-- [ ] **Step 2: 重写压缩模板与局部样式**
+- [x] **Step 2: 重写压缩模板与局部样式**
 
 将 `CandidateInbox.vue` 和 `MemoryDetail.vue` 改为正常格式，使用 `UiButton`、`UiStatusPanel`、`UiDialog`、语义令牌，移除页面级原生按钮规则。
 
-- [ ] **Step 3: 明确审核与危险动作**
+- [x] **Step 3: 明确审核与危险动作**
 
 Approve/Reject 具有文字和图标；Revise 提供保存中/成功/失败状态；Invalidate、Hard delete、Purge source 使用不同强度的确认说明。知识库清空和账户清空放到独立 Danger Zone。
 
-- [ ] **Step 4: Memory 验收**
+- [x] **Step 4: Memory 验收**
 
 检查候选审核、选择、修订、失效、删除、source purge、knowledge base purge、account purge 和自动学习开关；Expected: 每个异步动作都有 pending 防重复提交和完成反馈。
 
@@ -409,23 +409,23 @@ Approve/Reject 具有文字和图标；Revise 提供保存中/成功/失败状�
 - Modify: `app/mneme_frontend_v0.2.1/src/components/channels/ChannelGatewayPanel.vue`
 - Modify: `app/mneme_frontend_v0.2.1/src/i18n/messages.ts`
 
-- [ ] **Step 1: 使用连续设置行代替卡片堆叠**
+- [x] **Step 1: 使用连续设置行代替卡片堆叠**
 
 Appearance、Language、Channels、Models、Sync、Health 仍按锚点分组，但组内使用 label/description/control 三列设置行；只有模型实例、回调地址和危险状态使用带边框容器。
 
-- [ ] **Step 2: 让保存反馈靠近触发点**
+- [x] **Step 2: 让保存反馈靠近触发点**
 
 主题与语言即时生效；context window 保存、模型测试、默认模型切换、图谱/记忆重建的 pending/success/error 出现在对应行，不使用页面顶部通用字符串。
 
-- [ ] **Step 3: 简化 Channel Gateway 的扫描路径**
+- [x] **Step 3: 简化 Channel Gateway 的扫描路径**
 
 顶部展示 Ready/Degraded/Offline 总状态；Deployment、Bindings、Routing、Delivery 分段排列。回调地址提供复制反馈；长 command 使用等宽区域和明确的复制按钮。
 
-- [ ] **Step 4: 响应式与本地化**
+- [x] **Step 4: 响应式与本地化**
 
 桌面侧栏 sticky，平板顶部横向 section nav，移动端改为 select/accordion，不能依赖横向滚动访问最后一项。修复 `zh-CN` 标签和所有遗留硬编码英文。
 
-- [ ] **Step 5: Settings 验收**
+- [x] **Step 5: Settings 验收**
 
 检查 light/dark/system、English/简体中文、模型测试/default/context、同步重建和 channel routing；Expected: 设置结果靠近操作显示，Danger/Degraded 不只依赖颜色。
 
@@ -436,7 +436,7 @@ Appearance、Language、Channels、Models、Sync、Health 仍按锚点分组，�
 - Modify only if defects are found: affected files under `app/mneme_frontend_v0.2.1/src/components/`
 - Modify only if defects are found: affected files under `app/mneme_frontend_v0.2.1/src/views/`
 
-- [ ] **Step 1: 运行静态与构建检查**
+- [x] **Step 1: 运行静态与构建检查**
 
 Run: `npm run lint`
 
@@ -471,6 +471,26 @@ Expected: 所有现有测试通过；如测试断言绑定旧视觉结构，先�
 - [ ] **Step 6: 性能检查**
 
 在 Graph 模拟与 AI 流式输出同时发生时记录 Performance；Expected: 动画只涉及 transform/opacity/color，持续交互不通过父级 CSS variable 触发整树重算，主线程没有由装饰动画造成的长任务。
+
+### 最终统一审查记录（2026-07-28）
+
+本轮按统一审查逐项收口了实现缺陷：消除 Vault/Graph/AI 的双重上下文侧栏，恢复 Graph 的全局工具栏与帮助入口，统一 1024px 响应式边界和移动安全区，补齐 Graph/AI 抽屉及预览浮层的 Escape、焦点约束、焦点返回与 `inert` 行为；同时完成 AI、Memory、移动导航和动作反馈的双语迁移，修复浅色次级文字与主按钮 hover 对比度、StatusBar 实际状态语义、More 的 `aria-expanded`、分段控件冲突语义、空文件夹删除确认，以及模型测试失败仍显示成功的问题。
+
+验证证据：
+
+- `npm run lint`：通过。
+- `npm run test:contracts`：5/5 通过。
+- `npm run build`：通过；主应用包 281.95 kB（gzip 77.11 kB），CSS 136.76 kB（gzip 21.50 kB）。
+- 聚焦 Playwright 回归：AI 流式/渠道、Graph 交互、本地化、Memory 共 17/17 通过；平板 Shell、移动端溢出和移动 Graph 首屏共 3/3 通过；提交门禁再次抽查 Graph 预览/筛选、reduced-motion 和响应式共 6/6 通过。
+- 双语词典：`en-US` 与 `zh-CN` 各 539 个键；389 个静态 `t("…")` 调用无缺失键。
+- 对比度复核：浅色 `--content-tertiary` 对画布约 4.79:1；主按钮 hover 文本在深/浅主题分别约 7.25:1、7.74:1。
+- 源码扫描：无 `transition: all`、UI `ease-in`、`scale(0)` 入场和遗留 `1023px` 断点；`git diff --check` 无空白错误。
+- 一次性浏览器验证（不修改测试文件）：Graph 移动预览支持遮罩和 Escape 关闭，390↔1000px 切换会同步切换 modal 语义并把焦点在面板与原节点之间正确交接；文件夹操作 Popover→删除确认框→取消可稳定回到 Folder Actions 触发器。
+- 独立复审：最终结论为无 Critical、无 Important；复审补充的 Graph 预览层级小问题也已修复。
+
+现有 E2E 全量抽样矩阵为 51/68 通过。17 个失败均命中旧结构断言：它们仍直接寻找已经按计划移除的重复 Shell 资源栏、英文 `Toggle/Open resources` 标签，或移动底栏中的 Memory/Settings 直达按钮；新结构已将这些入口收敛到视图自有侧栏和 More。真实的移动 Graph 首屏回归已修复并在聚焦场景中通过。根据项目级 Test Addition Policy，本轮没有修改测试文件，因此 **Task 10 Step 2 仍保持未勾选**，不能宣称现有 E2E 全绿。
+
+Task 10 Step 3–6 也保持未勾选，原因是尚未完成“所有页面 × 双主题 × 全尺寸”的穷举式人工矩阵、Chrome 25% 动效慢放、全业务键盘路径以及 Graph/AI 并发 Performance 录制；现有自动化与源码复核已覆盖本轮缺陷，但不能替代这些计划中写明的最终人工/性能门禁。
 
 ## 7. 实施顺序与里程碑
 

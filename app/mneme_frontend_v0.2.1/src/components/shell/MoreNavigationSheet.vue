@@ -23,6 +23,7 @@ const { themeMode, setThemeMode } = usePreferences();
 const panel = ref<HTMLElement | null>(null);
 let previousFocus: HTMLElement | null = null;
 let previousOverflow = "";
+let modalActive = false;
 
 const themeModel = computed({
   get: () => themeMode.value,
@@ -68,33 +69,37 @@ function runAction(action: "documentation" | "support" | "logout") {
   emit("close");
 }
 
+function releaseSheet(restoreFocus: boolean) {
+  if (!modalActive) return;
+  document.removeEventListener("keydown", onKeydown);
+  document.body.style.overflow = previousOverflow;
+  if (restoreFocus) previousFocus?.focus();
+  previousFocus = null;
+  modalActive = false;
+}
+
 watch(() => props.open, async (open) => {
   if (open) {
     previousFocus = document.activeElement as HTMLElement | null;
     previousOverflow = document.body.style.overflow;
+    modalActive = true;
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKeydown);
     await nextTick();
     panel.value?.querySelector<HTMLElement>("button")?.focus();
     return;
   }
-  document.removeEventListener("keydown", onKeydown);
-  document.body.style.overflow = previousOverflow;
-  previousFocus?.focus();
-  previousFocus = null;
+  releaseSheet(true);
 });
 
-onBeforeUnmount(() => {
-  document.removeEventListener("keydown", onKeydown);
-  document.body.style.overflow = previousOverflow;
-});
+onBeforeUnmount(() => releaseSheet(false));
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="more-sheet">
       <div v-if="open" class="more-sheet" role="presentation">
-        <button class="more-sheet__scrim" type="button" aria-label="Close more navigation" @click="emit('close')" />
+        <button class="more-sheet__scrim" type="button" :aria-label="t('shell.closeMoreNavigation')" @click="emit('close')" />
         <section
           ref="panel"
           id="more-navigation-sheet"
@@ -105,11 +110,11 @@ onBeforeUnmount(() => {
           aria-labelledby="more-sheet-title"
         >
           <header>
-            <div><small>{{ userName }}</small><h2 id="more-sheet-title">More</h2></div>
-            <UiIconButton label="Close" @click="emit('close')"><X /></UiIconButton>
+            <div><small>{{ userName }}</small><h2 id="more-sheet-title">{{ t("shell.more") }}</h2></div>
+            <UiIconButton :label="t('shell.close')" @click="emit('close')"><X /></UiIconButton>
           </header>
 
-          <nav aria-label="Additional workspace views">
+          <nav :aria-label="t('shell.additionalViews')">
             <button
               v-for="item in items"
               :key="item.id"
@@ -130,7 +135,7 @@ onBeforeUnmount(() => {
           <footer>
             <button type="button" @click="runAction('documentation')"><BookOpen />{{ t("shell.documentation") }}</button>
             <button type="button" @click="runAction('support')"><LifeBuoy />{{ t("shell.support") }}</button>
-            <button type="button" class="more-sheet__logout" @click="runAction('logout')"><LogOut />Log out</button>
+            <button type="button" class="more-sheet__logout" @click="runAction('logout')"><LogOut />{{ t("shell.logout") }}</button>
           </footer>
         </section>
       </div>
