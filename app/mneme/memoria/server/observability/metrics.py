@@ -1,3 +1,8 @@
+"""Expose privacy-safe observability helpers for Memoria metrics.
+
+Metrics and logs report bounded metadata without prompts, answers, evidence bodies, or secrets.
+"""
+
 from dataclasses import dataclass
 
 Labels = tuple[tuple[str, str], ...]

@@ -1,3 +1,8 @@
+"""Project Mneme-owned documents data into the independent Memoria service.
+
+Projection messages carry stable identities and versions so backfills and retries remain idempotent.
+"""
+
 import hashlib
 from datetime import datetime
 

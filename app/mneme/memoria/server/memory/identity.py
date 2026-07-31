@@ -1,3 +1,8 @@
+"""Build stable normalized identities for memories, evidence records, and reconciliation lock slots.
+
+Canonical hashes make retries idempotent without treating raw user text as an identifier.
+"""
+
 import hashlib
 import json
 
@@ -12,10 +17,20 @@ def _canonical_identity(tag: str, values: list[str | int | None]) -> bytes:
 
 
 def normalize_memory_text(value: str) -> str:
+    """Normalize memory text before hashing or comparing identity slots.
+
+    Normalization is intentionally conservative so semantically different
+    facts are not merged merely because they look similar.
+    """
     return " ".join(value.strip().split()).casefold()
 
 
 def memory_fingerprint(*, subject: str, predicate: str, value: str) -> str:
+    """Return a stable content identity for one normalized subject-predicate-value fact.
+
+    The fingerprint supports idempotent retries and compatible-memory lookup;
+    it is not used as an authorization token.
+    """
     normalized = "\x1f".join(
         (
             normalize_memory_text(subject),
@@ -35,6 +50,11 @@ def evidence_identity(
     source_version: str,
     content_hash: str,
 ) -> str:
+    """Build the idempotency identity for one scoped source-evidence version.
+
+    Owner, knowledge base, source identity, source version, and content hash
+    all participate so unrelated evidence cannot collide across scopes.
+    """
     values: list[str | int | None] = [
         owner_id,
         knowledge_base_id,
@@ -55,6 +75,11 @@ def memory_slot_lock_key(
     subject: str,
     predicate: str,
 ) -> int:
+    """Build a deterministic advisory-lock key for a logical memory slot.
+
+    A slot is the owner/KB/type/subject/predicate location where competing
+    values must be reconciled serially.
+    """
     identity = _canonical_identity(
         "mneme:memory-slot-lock",
         [

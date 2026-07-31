@@ -1,3 +1,8 @@
+"""Implement user-initiated confirmation, rejection, revision, invalidation, and deletion commands.
+
+Commands lock scoped rows and record audit data before committing governance changes.
+"""
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -23,12 +28,16 @@ from app.mneme.memoria.server.services.deletion import DeletionResult, delete_so
 
 @dataclass(frozen=True)
 class PurgeCounts:
+    """Aggregate rows removed while purging one or more memory scopes."""
+
     evidence: int = 0
     candidates: int = 0
     revisions: int = 0
     memories: int = 0
 
     def add(self, result: DeletionResult) -> "PurgeCounts":
+        """Return a new total with counts from one deletion operation."""
+
         return PurgeCounts(
             evidence=self.evidence + result.deleted_evidence_count,
             candidates=self.candidates + result.deleted_candidate_count,
@@ -38,6 +47,8 @@ class PurgeCounts:
 
 
 class PurgeConfirmationReplay(ValueError):
+    """Raised when a one-time destructive-action confirmation is reused."""
+
     pass
 
 
@@ -75,6 +86,13 @@ def _audit(
 async def confirm(
     db: AsyncSession, *, candidate_id: str, owner_id: int, knowledge_base_id: str | None, actor_id: str, reason: str
 ) -> CanonicalMemory:
+    """Promote a scoped candidate to canonical memory and record the action.
+
+    The candidate's identity is read first so the corresponding logical memory
+    slot can be locked. Reconciliation and audit insertion then participate in
+    the caller's transaction.
+    """
+
     identity = await db.execute(
         select(MemoryCandidate.memory_type, MemoryCandidate.subject, MemoryCandidate.predicate).where(
             MemoryCandidate.candidate_id == candidate_id,
@@ -114,6 +132,8 @@ async def confirm(
 async def reject(
     db: AsyncSession, *, candidate_id: str, owner_id: int, knowledge_base_id: str | None, actor_id: str, reason: str
 ) -> MemoryCandidate:
+    """Reject a scoped candidate under its slot lock and append an audit row."""
+
     identity = await db.execute(
         select(MemoryCandidate.memory_type, MemoryCandidate.subject, MemoryCandidate.predicate).where(
             MemoryCandidate.candidate_id == candidate_id,
@@ -163,6 +183,13 @@ async def revise(
     actor_id: str,
     reason: str,
 ) -> CanonicalMemory:
+    """Create a user-authored revision while protecting both old and new slots.
+
+    A revision may change the subject or predicate and therefore move the memory
+    to a different uniqueness slot. Locks are acquired in sorted order to avoid
+    deadlocks between concurrent moves in opposite directions.
+    """
+
     current = await db.execute(
         select(CanonicalMemory.memory_type, CanonicalMemory.subject, CanonicalMemory.predicate).where(
             CanonicalMemory.memory_id == memory_id,
@@ -216,6 +243,8 @@ async def revise(
 async def invalidate(
     db: AsyncSession, *, memory_id: str, owner_id: int, knowledge_base_id: str | None, actor_id: str, reason: str
 ) -> CanonicalMemory:
+    """Mark an active canonical memory invalid without erasing its history."""
+
     identity = await db.execute(
         select(CanonicalMemory.memory_type, CanonicalMemory.subject, CanonicalMemory.predicate).where(
             CanonicalMemory.memory_id == memory_id,
@@ -262,6 +291,13 @@ async def invalidate(
 async def hard_delete(
     db: AsyncSession, *, memory_id: str, owner_id: int, knowledge_base_id: str | None, actor_id: str, reason: str
 ) -> None:
+    """Permanently remove a scoped memory and its dependent provenance.
+
+    Evidence-backed memories use the common source-deletion path so candidates
+    and revisions are reconciled consistently. An audit row is retained in the
+    surrounding transaction to identify the actor and reason.
+    """
+
     identity = await db.execute(
         select(CanonicalMemory.memory_type, CanonicalMemory.subject, CanonicalMemory.predicate).where(
             CanonicalMemory.memory_id == memory_id,
@@ -313,6 +349,8 @@ async def hard_delete(
 async def purge_source(
     db: AsyncSession, *, owner_id: int, knowledge_base_id: str | None, source_id: str
 ) -> PurgeCounts:
+    """Delete all memory artifacts derived from one source document."""
+
     return PurgeCounts().add(
         await delete_source_evidence(
             db,
@@ -325,6 +363,8 @@ async def purge_source(
 
 
 async def purge_knowledge_base(db: AsyncSession, *, owner_id: int, knowledge_base_id: str) -> PurgeCounts:
+    """Delete all memory artifacts in one owner/knowledge-base scope."""
+
     return PurgeCounts().add(
         await delete_source_evidence(
             db,
@@ -336,6 +376,8 @@ async def purge_knowledge_base(db: AsyncSession, *, owner_id: int, knowledge_bas
 
 
 async def purge_owner(db: AsyncSession, *, owner_id: int) -> PurgeCounts:
+    """Delete memory artifacts across every knowledge-base scope for an owner."""
+
     scopes: set[str | None] = set(
         await db.scalars(select(CanonicalMemory.knowledge_base_id).where(CanonicalMemory.owner_id == owner_id))
     )
@@ -366,6 +408,13 @@ async def consume_purge_confirmation(
     reason: str,
     confirmation_jti: str,
 ) -> None:
+    """Atomically consume a one-time confirmation token before a purge.
+
+    The audit table's unique constraint on ``confirmation_jti`` is the replay
+    barrier. Callers must invoke this in the same transaction as the destructive
+    operation so a rollback restores both the data and token usability.
+    """
+
     _audit(
         db,
         owner_id=owner_id,

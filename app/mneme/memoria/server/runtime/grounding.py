@@ -1,3 +1,10 @@
+"""Enforce answer-mode grounding requirements before final response generation.
+
+The policy admits only uniquely identified, correctly scoped evidence of an
+allowed source type. It also prevents general-chat answers from claiming access
+to private evidence or completed private-data tools.
+"""
+
 from collections import Counter
 from collections.abc import Collection, Sequence
 from typing import Any
@@ -38,6 +45,8 @@ GROUNDING_REQUIREMENTS: dict[AnswerMode, GroundingRequirement] = {
 
 
 def grounding_requirement_for_mode(mode: AnswerMode) -> GroundingRequirement:
+    """Return the immutable grounding policy configured for an answer mode."""
+
     return GROUNDING_REQUIREMENTS[mode]
 
 
@@ -51,7 +60,20 @@ def evaluate_grounding(
     tool_evidence_ids: Collection[str] = (),
     claimed_evidence_ids: Collection[str] = (),
 ) -> GroundingDecision:
+    """Evaluate whether retrieved evidence and tool results satisfy grounding.
+
+    Evidence is accepted only when its ID is unique in the packet, its source
+    type is permitted, and its owner/run metadata matches the request scope.
+    Tool-produced evidence is bound to both owner and run because it has a
+    shorter trust path than persisted retrieval evidence.
+
+    General chat applies the inverse rule: it may answer without evidence, but
+    any private evidence, claimed evidence ID, or completed private-data tool
+    makes the response ineligible.
+    """
+
     tool_evidence_id_set = frozenset(tool_evidence_ids)
+    # Duplicate IDs are ambiguous citation targets, so neither copy is admitted.
     evidence_id_counts = Counter(item.evidence_id for item in evidence)
     required_source_types = set(requirement.required_source_types)
     accepted = [
@@ -99,6 +121,8 @@ def evaluate_grounding(
 
 
 def grounding_policy_statement(requirement: GroundingRequirement) -> str:
+    """Render the grounding contract included in the model system prompt."""
+
     if requirement.allow_ungrounded_final:
         policy = "an ungrounded general-knowledge final answer is allowed, without private-source access claims"
     else:
@@ -118,6 +142,8 @@ def _matches_scope(
     run_id: str,
     from_tool: bool,
 ) -> bool:
+    """Check owner scope and, for tool evidence, the producing run identity."""
+
     evidence_owner_id = evidence.metadata.get("owner_id")
     evidence_run_id = evidence.metadata.get("run_id")
     if from_tool:

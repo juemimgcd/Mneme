@@ -1,3 +1,8 @@
+"""Create and query source deletion fences used by projection and memory workers.
+
+Fences compare event ordering metadata so stale deliveries cannot recreate deleted state.
+"""
+
 import hashlib
 import json
 from dataclasses import dataclass
@@ -71,6 +76,12 @@ async def event_is_blocked_by_deletion(
     *,
     sources: list[FenceSource],
 ) -> bool:
+    """Return whether an event is older than an applicable deletion fence.
+
+    Knowledge-base fences are checked in addition to the explicit sources so a
+    late document or conversation event cannot bypass a broader KB deletion.
+    Ordering uses ``(occurred_at, event_id)`` for deterministic ties.
+    """
     scoped_sources = _sources_with_knowledge_base(event, sources)
     if not scoped_sources:
         return False
@@ -109,6 +120,16 @@ async def advance_deletion_fences(
     primary: FenceSource,
     additional: list[FenceSource] | None = None,
 ) -> bool:
+    """Advance deletion fences when the incoming event is the newest command.
+
+    The primary fence is locked to serialize competing deletion events. All
+    additional fences are upserted with a monotonic SQL predicate, making replay
+    and out-of-order delivery safe.
+
+    Returns:
+        ``True`` when this event owns the newest deletion order and cleanup
+        should proceed; ``False`` for an older or replayed event.
+    """
     primary_key = _fence_key(
         owner_id=event.owner_id,
         knowledge_base_id=event.knowledge_base_id,

@@ -1,3 +1,8 @@
+"""Retrieve governed memory revisions for the requested owner and temporal scope.
+
+Only active revisions are returned for current queries; history queries retain version visibility.
+"""
+
 from datetime import datetime
 from typing import Literal
 
@@ -18,6 +23,11 @@ def _knowledge_base_clause(knowledge_base_id: str | None):
 
 
 class MemoryRetriever:
+    """Read governed canonical-memory revisions as answer evidence.
+
+    The retriever can select current or historical revisions and constrain
+    memory types while preserving owner and optional knowledge-base scope.
+    """
     async def search(
         self,
         *,
@@ -30,6 +40,11 @@ class MemoryRetriever:
         excluded_memory_types: tuple[str, ...] | None = None,
         evidence_type: Literal["memory", "profile"] = "memory",
     ) -> list[RetrievedEvidence]:
+        """Search scoped memory revisions and return normalized evidence records.
+
+        Current queries require the canonical memory's active revision and
+        validity window. Text matching influences order but never expands scope.
+        """
         if top_k <= 0:
             return []
 

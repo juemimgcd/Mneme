@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria automation.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 from datetime import datetime, timedelta, timezone
 from typing import Any
 

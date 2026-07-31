@@ -1,3 +1,8 @@
+"""Implement durable Memoria automation behavior for service.
+
+Database state is authoritative; queue and outbox delivery may be retried without duplicating effects.
+"""
+
 import hashlib
 import json
 import uuid

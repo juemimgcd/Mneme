@@ -1,3 +1,8 @@
+"""Implement Memoria run models application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 import uuid
 from datetime import datetime, timezone
 from enum import Enum

@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria document chunk.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from typing import Any
 
 from pgvector.sqlalchemy import Vector

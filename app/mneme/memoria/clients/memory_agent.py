@@ -1,3 +1,8 @@
+"""Adapt Memoria memory agent calls across an external or architectural boundary.
+
+The adapter preserves validated contracts, scope, retries, and error classification.
+"""
+
 import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -50,6 +55,12 @@ class MemoryAgentRejected(MemoryAgentPermanentFailure):
 
 
 class MemoryAgentClient:
+    """Async HTTP client for the independently deployed Memoria service.
+
+    The client applies service authentication, request IDs, timeouts, and
+    error classification consistently across answer, event, and governance
+    endpoints. It never retries permanent contract rejections as outages.
+    """
     def __init__(self) -> None:
         timeout = httpx.Timeout(float(settings.MEMORY_AGENT_TIMEOUT_SECONDS))
         self._client = httpx.AsyncClient(
@@ -68,6 +79,11 @@ class MemoryAgentClient:
         await self._client.aclose()
 
     async def submit_event(self, event: MemoryAgentEvent) -> EventReceipt:
+        """Submit one idempotent projection or memory event to Memoria.
+
+        A stable event identity lets the server acknowledge replayed delivery
+        without repeating the underlying domain effect.
+        """
         response = await self._post_json(
             path="/internal/v1/events",
             payload=event.model_dump(mode="json"),
@@ -81,6 +97,11 @@ class MemoryAgentClient:
             raise MemoryAgentPermanentFailure("memory agent returned an invalid event receipt") from exc
 
     async def create_answer(self, request: MemoryAgentAnswerRequest) -> MemoryAgentAnswerResponse:
+        """Request a non-streaming answer and validate the response contract.
+
+        Network and server failures are converted into retryable or permanent
+        client exceptions so durable-run policy remains outside the HTTP layer.
+        """
         response = await self._post_json(
             path="/v1/answers",
             payload=_answer_request_payload(request),
@@ -96,6 +117,11 @@ class MemoryAgentClient:
             raise MemoryAgentPermanentFailure("memory agent returned an invalid answer response") from exc
 
     async def stream_answer(self, request: MemoryAgentAnswerRequest) -> AsyncIterator[MemoryAgentStreamEvent]:
+        """Yield validated events from the Memoria answer stream.
+
+        The stream parser rejects malformed or out-of-order terminal payloads
+        and leaves cancellation decisions to the durable run owner.
+        """
         if not settings.MEMORY_AGENT_SERVICE_JWT_SECRET.get_secret_value():
             raise MemoryAgentPermanentFailure("memory agent service credentials are not configured")
         try:
@@ -132,6 +158,8 @@ class MemoryAgentClient:
 
                 data_lines: list[str] = []
                 async for line in response.aiter_lines():
+                    # SSE permits one event payload to span several ``data:``
+                    # lines. Parse only at the blank-line event boundary.
                     if line.startswith("data:"):
                         data_lines.append(line[5:].lstrip())
                         continue
@@ -143,6 +171,8 @@ class MemoryAgentClient:
                         raise MemoryAgentPermanentFailure("memory agent returned an invalid stream event") from exc
                     data_lines.clear()
                     if event.type == "error":
+                        # Retryability follows the stable Agent code rather than
+                        # human-readable event text, which may change.
                         code = event.code or "AGENT_INTERNAL_ERROR"
                         if code.endswith("_TIMEOUT") or code in {
                             "AGENT_CAPACITY_EXCEEDED",

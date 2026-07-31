@@ -1,3 +1,8 @@
+"""Execute source-specific retrieval roles under one shared deadline and retrieval budget.
+
+Partial failures become degraded bundles; only total source failure aborts the retrieval phase.
+"""
+
 import asyncio
 from collections.abc import Awaitable, Callable
 from time import perf_counter
@@ -40,6 +45,11 @@ ROLE_TYPES = {
 
 
 class BoundedMultiAgentExecutor:
+    """Run coordinator-selected retrieval roles under one shared budget.
+
+    Source errors are isolated into degraded bundles, missing sources may be
+    retried once, and the final Judge output remains bounded by request Top-K.
+    """
     def __init__(
         self,
         *,
@@ -54,6 +64,11 @@ class BoundedMultiAgentExecutor:
         self._judge = judge or EvidenceJudge()
 
     def plan(self, request: AnswerRequest, plan: RetrievalPlan):
+        """Return the coordinator decision for a request without executing retrieval.
+
+        This method is useful for observability and for selecting the single-path
+        fallback before any role budget is consumed.
+        """
         return self._coordinator.decide(request, plan, self.limits)
 
     async def execute(
@@ -63,6 +78,12 @@ class BoundedMultiAgentExecutor:
         *,
         event_callback: MultiAgentEventCallback | None = None,
     ) -> MultiAgentExecutionResult:
+        """Execute one coordinator-approved Multi-Agent retrieval plan.
+
+        Raises:
+            ValueError: If the coordinator selected the single-agent path.
+            RuntimeError: If every selected source fails.
+        """
         budget = SharedMultiAgentBudget(self.limits)
         decision = self.plan(request, plan)
         if decision.execution_mode != "multi":
@@ -97,6 +118,8 @@ class BoundedMultiAgentExecutor:
             supplemental_round=0,
         )
         role_attempts.extend(attempts)
+        # Individual failures stay inside bundles so the Judge can use healthy
+        # sources. Only total source failure makes retrieval unusable.
         if bundles and all(bundle.error_code for bundle in bundles):
             raise RuntimeError("all multi-agent retrieval sources failed")
 
@@ -111,6 +134,8 @@ class BoundedMultiAgentExecutor:
             and decision.allow_supplemental
             and judged.missing_sources
         ):
+            # Retry only missing sources; repeating healthy roles would spend
+            # budget without increasing source coverage.
             retry_assignments = [
                 item
                 for item in decision.assignments
@@ -127,6 +152,8 @@ class BoundedMultiAgentExecutor:
                     supplemental_round=1,
                 )
             except MultiAgentBudgetExceeded:
+                # Budget exhaustion degrades quality but must not erase evidence
+                # already collected during the first round.
                 supplemental = []
                 supplemental_attempts = []
             bundles.extend(supplemental)
@@ -184,6 +211,9 @@ class BoundedMultiAgentExecutor:
         event_callback: MultiAgentEventCallback | None,
         supplemental_round: int,
     ) -> tuple[list[EvidenceBundle], list[RoleAttempt]]:
+        # Reserve every assignment before starting the TaskGroup. Reserving
+        # inside each coroutine would race and could partially launch a plan
+        # whose aggregate Top-K exceeds the configured budget.
         for assignment in assignments:
             budget.reserve_retrieval(assignment.top_k)
 
@@ -256,6 +286,9 @@ class BoundedMultiAgentExecutor:
                 },
             )
 
+        # TaskGroup preserves structured parent cancellation. ``run_one``
+        # converts ordinary source exceptions into degraded bundles, so those
+        # errors do not cancel otherwise healthy sibling sources.
         async with asyncio.TaskGroup() as group:
             for assignment in assignments:
                 group.create_task(run_one(assignment))

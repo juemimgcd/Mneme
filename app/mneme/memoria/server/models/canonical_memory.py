@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria canonical memory.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from datetime import datetime
 from typing import Literal
 

@@ -1,3 +1,8 @@
+"""Retrieve document chunks with PostgreSQL full-text search inside an authorized scope.
+
+Lexical search complements dense vectors for exact identifiers, dates, and domain terminology.
+"""
+
 from sqlalchemy import func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +18,11 @@ async def search_keyword(
     query: str,
     limit: int,
 ) -> list[DocumentSearchHit]:
+    """Return full-text matches for the query from active scoped document chunks.
+
+    PostgreSQL ``simple`` configuration favors exact lexical identifiers;
+    callers combine this ranking with dense-vector results for recall.
+    """
     if limit <= 0:
         return []
 

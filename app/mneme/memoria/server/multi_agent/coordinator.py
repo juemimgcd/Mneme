@@ -1,3 +1,8 @@
+"""Select bounded retrieval roles for an explicitly requested Multi-Agent run.
+
+The coordinator is deterministic policy and never retrieves, writes, invokes a model, or spawns work.
+"""
+
 import hashlib
 
 from app.mneme.memoria.server.config import settings
@@ -28,6 +33,11 @@ class RAGCoordinator:
         plan: RetrievalPlan,
         limits: MultiAgentBudgetLimits,
     ) -> CoordinatorDecision:
+        """Choose single- or Multi-Agent execution and allocate source Top-K limits.
+
+        Allocation stays within the shared retrieval budget and uses stable
+        rollout hashing so retries cannot switch execution modes unexpectedly.
+        """
         enabled = [
             source
             for source, selected in (

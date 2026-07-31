@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria projections.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 import hashlib
 import json
 from dataclasses import dataclass

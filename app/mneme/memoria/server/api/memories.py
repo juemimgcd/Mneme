@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria memories.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -167,6 +172,7 @@ async def list_memories(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> MemoryList:
+    """List canonical memories visible in the exact claimed owner/KB scope."""
     require_claimed_scope(claims, owner_id=owner_id, knowledge_base_id=knowledge_base_id)
     query = select(CanonicalMemory).where(
         CanonicalMemory.owner_id == owner_id,
@@ -202,6 +208,7 @@ async def get_memory_detail(
     owner_id: int = Query(gt=0),
     knowledge_base_id: str | None = Query(default=None, max_length=128),
 ) -> MemoryDetailDTO:
+    """Return one memory with its revision history and supporting evidence."""
     require_claimed_scope(claims, owner_id=owner_id, knowledge_base_id=knowledge_base_id)
     async with open_read_session() as db:
         memory = await db.scalar(
@@ -264,6 +271,7 @@ async def list_candidates(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> CandidateList:
+    """List review candidates without crossing the service token's data scope."""
     require_claimed_scope(claims, owner_id=owner_id, knowledge_base_id=knowledge_base_id)
     query = select(MemoryCandidate).where(
         MemoryCandidate.owner_id == owner_id,
@@ -311,6 +319,7 @@ async def command_candidate(
     command: CandidateCommand,
     claims: Annotated[dict[str, Any], Depends(require_service_scope(MEMORIES_WRITE_SCOPE))],
 ) -> CanonicalMemoryDTO | CandidateDTO:
+    """Confirm or reject a pending candidate in one write transaction."""
     require_claimed_scope(claims, owner_id=command.owner_id, knowledge_base_id=command.knowledge_base_id)
     try:
         async with open_write_session() as db:
@@ -347,6 +356,7 @@ async def command_memory(
     command: MemoryCommand,
     claims: Annotated[dict[str, Any], Depends(require_service_scope(MEMORIES_WRITE_SCOPE))],
 ) -> CanonicalMemoryDTO:
+    """Revise or invalidate a governed memory after scope and sensitivity checks."""
     require_claimed_scope(claims, owner_id=command.owner_id, knowledge_base_id=command.knowledge_base_id)
     try:
         async with open_write_session() as db:
@@ -388,6 +398,7 @@ async def delete_memory(
     command: DeleteCommand,
     claims: Annotated[dict[str, Any], Depends(require_service_scope(MEMORIES_WRITE_SCOPE))],
 ) -> dict[str, bool | str]:
+    """Hard-delete one scoped memory and append the corresponding audit record."""
     require_claimed_scope(claims, owner_id=command.owner_id, knowledge_base_id=command.knowledge_base_id)
     try:
         async with open_write_session() as db:

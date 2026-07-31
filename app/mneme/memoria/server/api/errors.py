@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria errors.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 

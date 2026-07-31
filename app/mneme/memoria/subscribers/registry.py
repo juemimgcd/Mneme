@@ -1,3 +1,8 @@
+"""Coordinate Memoria domain-event subscribers for registry.
+
+Subscriber registration is code-owned and delivery remains scoped, idempotent, and observable.
+"""
+
 from collections.abc import Iterable
 
 from app.mneme.memoria.subscribers.contracts import RuntimeSubscriber

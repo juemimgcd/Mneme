@@ -1,3 +1,8 @@
+"""Execute durable Agent runs and persist their terminal outcome.
+
+The service owns state transitions, cancellation checks, and replay-safe completion ordering.
+"""
+
 import asyncio
 import time
 import uuid
@@ -15,6 +20,12 @@ from app.mneme.memoria.run_models import TERMINAL_AGENT_RUN_STATUSES, AgentRunRe
 
 
 async def execute_agent_run(run_id: str) -> None:
+    """Claim and execute one durable Agent run through its terminal transition.
+
+    The worker checks cancellation and lease state, invokes the Memoria
+    boundary, persists messages and events in order, and records classified
+    failures so stale work can be recovered safely.
+    """
     record = await agent_run_store.get(run_id)
     if record is None:
         async with open_read_session() as db:
@@ -31,6 +42,8 @@ async def execute_agent_run(run_id: str) -> None:
         await agent_run_store.remove_from_session_queue(session_id=record.session_id, run_id=record.run_id)
         return
 
+    # Session FIFO plus a renewable lease ensures only one run mutates a chat
+    # session at a time, even when Celery redelivers a task.
     lease_token = f"lease_{uuid.uuid4().hex}"
     claimed = await _wait_for_session_turn(record, lease_token)
     if not claimed:
@@ -54,6 +67,8 @@ async def execute_agent_run(run_id: str) -> None:
     owner_task = asyncio.current_task()
     if owner_task is None:
         raise RuntimeError("agent run has no owning asyncio task")
+    # Monitors cancel the owning task to interrupt provider/network awaits.
+    # ``abort_signal`` distinguishes user intent from lost lease ownership.
     abort_monitor = asyncio.create_task(_monitor_abort(run_id, abort_signal, owner_task))
     lease_monitor = asyncio.create_task(
         _monitor_session_lease(
@@ -110,6 +125,8 @@ async def execute_agent_run(run_id: str) -> None:
                 ),
             )
         elif not lease_lost.is_set():
+            # Cancellation unrelated to explicit abort or lease loss belongs to
+            # the worker/runtime and must propagate to its caller.
             raise
         else:
             final_status = AgentRunStatus.FAILED
@@ -157,6 +174,8 @@ async def execute_agent_run(run_id: str) -> None:
         abort_monitor.cancel()
         lease_monitor.cancel()
         await asyncio.gather(abort_monitor, lease_monitor, return_exceptions=True)
+        # Release is token-checked by the store, so an expired worker cannot
+        # release a lease already reassigned to recovery work.
         await agent_run_store.release_session_turn(
             session_id=record.session_id,
             run_id=record.run_id,

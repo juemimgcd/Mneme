@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria memory candidate.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from datetime import datetime
 from typing import Any, Literal
 

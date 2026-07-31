@@ -1,3 +1,8 @@
+"""Define validated data contracts for Memoria answers.
+
+The models keep untrusted transport and provider data out of domain logic until validation succeeds.
+"""
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field

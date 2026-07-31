@@ -1,3 +1,8 @@
+"""Provide retrying, fallback-aware LLM access for Memoria generation phases.
+
+Provider attempts are observable without logging prompts, answers, credentials, or hidden reasoning.
+"""
+
 import asyncio
 import json
 import time
@@ -110,10 +115,20 @@ _PROVIDER_HEALTH = _ProviderHealthRegistry()
 
 
 class ConfiguredModelGateway:
+    """Generate answers through configured primary and fallback model routes.
+
+    The gateway owns provider retries, cooldown-aware route order, timeout
+    classification, usage aggregation, and privacy-safe attempt metadata.
+    """
     def __init__(self, *, tool_executor: ScopedToolExecutor | None = None) -> None:
         self._tool_executor = tool_executor
 
     async def generate(self, request: GenerationRequest) -> GeneratedAnswer:
+        """Generate one structured answer within request-level model budgets.
+
+        Provider output is parsed into the runtime contract before it can reach
+        citation validation. Exhausted or invalid routes fail with classified errors.
+        """
         configs = self._resolve_configs(request)
         attempts: list[dict[str, Any]] = []
         last_failure = _Failure("AGENT_MODEL_UNAVAILABLE", False)

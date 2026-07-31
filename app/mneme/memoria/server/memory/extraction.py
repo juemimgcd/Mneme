@@ -1,3 +1,8 @@
+"""Extract schema-validated durable memory candidates from a bounded evidence excerpt.
+
+Secret detection runs before provider construction, and model output must point to exact source offsets.
+"""
+
 import json
 
 from pydantic import ValidationError
@@ -42,6 +47,12 @@ def _raise_provider_error(exc: Exception) -> None:
 
 async def extract_candidates(evidence: EvidenceInput) -> list[ExtractedCandidate]:
     # This must remain before client construction and every external model call.
+    """Ask the extraction model for durable memories supported by exact evidence.
+
+    Secret-like excerpts short-circuit before client creation. Provider JSON
+    must validate against the fixed schema, and every candidate must point to
+    matching zero-based offsets in the original excerpt.
+    """
     if contains_secret(evidence.excerpt):
         return []
     api_key = settings.EXTRACTION_LLM_API_KEY.get_secret_value()

@@ -1,3 +1,8 @@
+"""Apply deterministic deduplication, conflict marking, coverage checks, and final evidence limits.
+
+The judge exposes uncertainty but does not claim semantic authority over conflicting natural language.
+"""
+
 from collections import defaultdict
 
 from app.mneme.memoria.server.multi_agent.contracts import (
@@ -18,6 +23,11 @@ class EvidenceJudge:
         selected_sources: list[str],
         final_top_k: int,
     ) -> JudgedEvidenceSet:
+        """Combine role bundles into the evidence set allowed to reach generation.
+
+        Conflicts indicate different content for one source identity; they are
+        surfaced as uncertainty rather than semantically resolved by this rule-based judge.
+        """
         candidates = [item for bundle in bundles for item in bundle.evidence]
         by_id = {}
         dropped: list[DroppedEvidence] = []

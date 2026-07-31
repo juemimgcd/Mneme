@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria automation.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 import uuid
 from datetime import datetime, timezone
 

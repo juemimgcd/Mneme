@@ -1,3 +1,8 @@
+"""Retrieve typed relationships between governed memories within the caller's scope.
+
+Relation evidence supplements facts but never expands owner or knowledge-base permissions.
+"""
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import aliased
 
@@ -9,6 +14,11 @@ from app.mneme.memoria.server.retrieval.contracts import RetrievedEvidence
 
 
 class RelationRetriever:
+    """Retrieve typed relations between active memories in the requested scope.
+
+    Relationship evidence is descriptive context; it does not authorize
+    retrieval of either endpoint outside the caller's owner and KB filters.
+    """
     async def search(
         self,
         *,
@@ -17,6 +27,11 @@ class RelationRetriever:
         query: str,
         top_k: int,
     ) -> list[RetrievedEvidence]:
+        """Search relation endpoints and return compact normalized evidence.
+
+        The query, confidence, and recency influence ordering after both endpoint
+        memories have passed scope and active-state checks.
+        """
         if top_k <= 0:
             return []
 

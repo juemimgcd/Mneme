@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria memory audit.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, Index, Integer, String, func

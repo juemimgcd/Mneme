@@ -1,3 +1,8 @@
+"""Configure Memoria router behavior and validate its startup policy.
+
+Secrets remain environment-backed while checked-in configuration owns reproducible Agent behavior.
+"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 

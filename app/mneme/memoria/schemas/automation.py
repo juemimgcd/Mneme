@@ -1,3 +1,8 @@
+"""Define validated data contracts for Memoria automation.
+
+The models keep untrusted transport and provider data out of domain logic until validation succeeds.
+"""
+
 from datetime import datetime
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError

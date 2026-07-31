@@ -1,3 +1,8 @@
+"""Configure Memoria service behavior and validate its startup policy.
+
+Secrets remain environment-backed while checked-in configuration owns reproducible Agent behavior.
+"""
+
 import base64
 import hashlib
 import uuid

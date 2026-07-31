@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria runs.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 import asyncio
 import json
 import uuid

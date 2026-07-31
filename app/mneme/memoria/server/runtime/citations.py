@@ -1,3 +1,8 @@
+"""Validate generated citations against evidence retrieved for the current answer run.
+
+Unknown evidence identifiers and quotes absent from the source text are rejected before delivery.
+"""
+
 from typing import Any
 
 from app.mneme.memoria.server.retrieval.contracts import RetrievedEvidence
@@ -20,11 +25,22 @@ SAFE_METADATA_KEYS = frozenset(
 
 
 class EvidenceCitationValidator:
+    """Enforce that generated citations refer to evidence from the current run.
+
+    Validation is identifier- and quote-based. It does not claim that every
+    answer sentence is semantically entailed by the cited source.
+    """
     def validate(
         self,
         answer: GeneratedAnswer,
         evidence: list[RetrievedEvidence],
     ) -> CitationResult:
+        """Filter citations and derive confidence from the remaining support.
+
+        Unknown IDs, duplicates, empty quotes, and quotes absent from source
+        text are removed. Private answer modes without valid support are marked
+        insufficient rather than returned with model-supplied confidence.
+        """
         retrieved = {item.evidence_id: item for item in evidence}
         citations: list[dict[str, Any]] = []
         seen: set[str] = set()

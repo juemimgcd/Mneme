@@ -1,3 +1,8 @@
+"""Retrieve document chunks by pgvector cosine distance inside an authorized scope.
+
+Owner, knowledge-base, projection, and active-state filters are applied before ranking and limiting.
+"""
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +19,12 @@ async def search_vector(
     query: str,
     limit: int,
 ) -> list[DocumentSearchHit]:
+    """Return the nearest active document chunks in the authorized scope.
+
+    Query embeddings are normalized by the embedding service. Owner,
+    knowledge-base, and projection filters are part of the SQL statement so
+    unauthorized candidates never participate in nearest-neighbor ranking.
+    """
     if limit <= 0:
         return []
 

@@ -24,6 +24,8 @@ from app.mneme.utils.exceptions import BusinessException
 
 
 async def resolve_model_config(db: AsyncSession, *, user_id: int, config_id: str | None):
+    """Resolve an enabled user-owned model config or the user's default."""
+
     if config_id is not None:
         config = await get_ai_model_config(db, config_id=config_id, user_id=user_id)
         if config is None or not config.enabled:
@@ -61,6 +63,14 @@ async def answer_via_memory_agent(
     event_callback: Callable[[MemoryAgentStreamEvent], Awaitable[None]] | None = None,
     conversation: ConversationContextData | None = None,
 ) -> MemoryAgentAnswerResponse:
+    """Translate a chat request into the Memoria answer contract.
+
+    Streaming events are forwarded when a callback is supplied. If the stream
+    transport is unavailable, the bridge retries through the non-streaming HTTP
+    endpoint with the same request identity, allowing Memoria's idempotency
+    handling to prevent duplicate runs.
+    """
+
     if answer_mode != "general_chat" and knowledge_base_id is None:
         raise BusinessException(message="knowledge base is required for this answer mode", code=4053)
     request = MemoryAgentAnswerRequest(
@@ -95,6 +105,13 @@ async def answer_via_memory_agent(
 
 
 def memory_agent_answer_to_chat_result(response: MemoryAgentAnswerResponse) -> dict:
+    """Adapt a Memoria response to the legacy Mneme chat response structure.
+
+    Only dictionary-shaped citation and tool-call records cross this boundary.
+    Source metadata is normalized so existing chat renderers can display
+    Memoria evidence without depending on the service's internal models.
+    """
+
     confidence = "high" if response.confidence >= 0.75 else "medium" if response.confidence >= 0.4 else "low"
     route = route_answer_mode(response.mode).model_dump()
     route["confidence"] = confidence
@@ -162,6 +179,13 @@ async def persist_action_proposals(
     run_id: str,
     tool_calls: list[dict],
 ) -> list[dict]:
+    """Persist approval-required write actions and return normalized traces.
+
+    Invalid proposals are downgraded to ``rejected``. Valid proposals use a
+    message/tool-call idempotency key so replaying a completed answer cannot
+    create multiple approval records for the same intended action.
+    """
+
     persisted: list[dict] = []
     for item in tool_calls:
         trace = dict(item)

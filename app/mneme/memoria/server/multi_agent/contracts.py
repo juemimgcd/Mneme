@@ -1,3 +1,8 @@
+"""Define coordinator, role, evidence, judge, and budget contracts for bounded Multi-Agent retrieval.
+
+Sensitive queries and evidence bodies are excluded from public representations and persisted telemetry.
+"""
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field

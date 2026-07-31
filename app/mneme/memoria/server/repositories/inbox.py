@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria inbox.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession

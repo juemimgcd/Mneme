@@ -1,3 +1,8 @@
+"""Configure Memoria config behavior and validate its startup policy.
+
+Secrets remain environment-backed while checked-in configuration owns reproducible Agent behavior.
+"""
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

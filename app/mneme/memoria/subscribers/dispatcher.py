@@ -1,3 +1,8 @@
+"""Coordinate Memoria domain-event subscribers for dispatcher.
+
+Subscriber registration is code-owned and delivery remains scoped, idempotent, and observable.
+"""
+
 import asyncio
 import hashlib
 import time

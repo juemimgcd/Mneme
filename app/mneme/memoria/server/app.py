@@ -1,3 +1,8 @@
+"""Implement Memoria app application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 import logging
 from contextlib import asynccontextmanager
 

@@ -1,3 +1,8 @@
+"""Define normalized scope, hit, and evidence contracts for Memoria retrievers.
+
+All sources convert backend-specific rows into RetrievedEvidence before runtime fusion.
+"""
+
 from dataclasses import dataclass
 from typing import Any, Literal
 

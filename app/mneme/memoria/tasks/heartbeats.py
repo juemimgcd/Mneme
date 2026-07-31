@@ -1,3 +1,8 @@
+"""Provide Celery task entry points for Memoria heartbeats.
+
+Tasks are thin synchronous wrappers around replay-safe asynchronous application services.
+"""
+
 from datetime import datetime, timedelta, timezone
 
 from app.mneme.conf.config import settings

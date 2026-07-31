@@ -1,3 +1,8 @@
+"""Fuse document rankings with deterministic reciprocal-rank fusion.
+
+Fusion uses rank positions instead of incomparable raw vector and lexical score scales.
+"""
+
 from collections.abc import Sequence
 
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievedEvidence
@@ -10,6 +15,11 @@ def reciprocal_rank_fusion(
     *,
     top_k: int,
 ) -> list[RetrievedEvidence]:
+    """Fuse backend rankings without comparing their incompatible raw scores.
+
+    Each unique chunk contributes ``1 / (60 + rank)`` once per ranking.
+    Deterministic chunk-ID tie breaking keeps replayed evaluations stable.
+    """
     if top_k <= 0:
         return []
 

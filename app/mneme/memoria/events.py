@@ -1,3 +1,8 @@
+"""Define sanitized Agent runtime events exposed to persistence and streaming consumers.
+
+Event payloads carry bounded metadata and deliberately exclude prompts, answers, and evidence text.
+"""
+
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any

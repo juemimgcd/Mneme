@@ -1,3 +1,8 @@
+"""Build and atomically activate document projections for Memoria retrieval.
+
+New chunks become visible as one versioned batch, avoiding partially indexed documents.
+"""
+
 import hashlib
 import json
 from dataclasses import dataclass
@@ -80,6 +85,9 @@ def _snapshot_hash(chunks: list[DocumentChunkPayload]) -> str:
 async def _prepare_projection(
     db: AsyncSession, projection: DocumentProjection
 ) -> PreparedProjection:
+    # Validate contiguous batches before concatenating chunks. Accepting a
+    # missing middle batch would create a syntactically valid but incomplete
+    # document that could later be cited.
     batches = await load_projection_batches(db, projection.projection_id)
     received_indexes = [batch.batch_index for batch in batches]
     expected_indexes = list(range(projection.batch_count))
@@ -131,6 +139,11 @@ async def stage_projection_batch(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> ProjectionBatchReceipt:
+    """Validate and stage one idempotent batch of document projection chunks.
+
+    Staged rows remain invisible to retrieval until finalization atomically
+    swaps the complete projection version.
+    """
     if not knowledge_base_id:
         raise ProjectionIntegrityError(
             "document projection events require a non-empty knowledge_base_id"
@@ -198,6 +211,8 @@ async def _activate_projection(
     if projection.status != "staging":
         raise ProjectionIntegrityError(f"cannot finalize a {projection.status} projection")
 
+    # Embeddings are generated outside the activation transaction. Rebuild the
+    # snapshot after locking to detect any late batch that arrived meanwhile.
     rechecked = await _prepare_projection(db, projection)
     if rechecked.snapshot_hash != prepared.snapshot_hash:
         raise ProjectionIntegrityError("projection batches changed during embedding")
@@ -216,6 +231,9 @@ async def _activate_projection(
     )
     old_projection_ids = [row.projection_id for row in old_projections]
     if old_projection_ids:
+        # Retiring old chunks and activating new chunks occur in the same
+        # transaction. Retrieval therefore sees either complete version, never
+        # a mixture of both.
         await db.execute(
             update(DocumentChunk)
             .where(DocumentChunk.projection_id.in_(old_projection_ids))
@@ -257,6 +275,14 @@ async def _activate_projection(
 
 
 async def finalize_projection(projection_id: str) -> bool:
+    """Atomically activate a complete projection and retire its predecessor.
+
+    Missing batches or chunk gaps fail closed so retrieval never observes a
+    partially indexed document version.
+    """
+    # The session-level advisory lock spans validation, external embedding, and
+    # activation. A row lock cannot cover that whole interval because keeping a
+    # database transaction open during model inference would be too expensive.
     async with engine.connect() as connection:
         await connection.execute(
             text("SELECT pg_advisory_lock(hashtextextended(:projection_id, 0))"),

@@ -1,3 +1,8 @@
+"""Consume source events and drive memory extraction and reconciliation transactionally.
+
+Inbox idempotency and evidence provenance make event replay safe.
+"""
+
 import hashlib
 from datetime import UTC, datetime
 
@@ -315,6 +320,11 @@ async def _extract_and_reconcile(
 
 
 async def handle_conversation_completed(event: AgentEventEnvelope) -> None:
+    """Extract and reconcile memories from a completed conversation event.
+
+    Inbox idempotency, user settings, exact evidence, and one transaction
+    ensure replay does not duplicate canonical memories.
+    """
     payload = _payload(ConversationCompletedPayload, event)
     if await event_is_blocked_by_deletion(
         event,
@@ -344,6 +354,11 @@ async def handle_conversation_completed(event: AgentEventEnvelope) -> None:
 
 
 async def handle_user_memory_requested(event: AgentEventEnvelope) -> None:
+    """Process an explicit user request to remember supported source content.
+
+    Explicit intent affects promotion policy but cannot override the absolute
+    prohibition on persisting secret candidates.
+    """
     payload = _payload(MemoryRequestedPayload, event)
     if await event_is_blocked_by_deletion(
         event,
@@ -368,6 +383,11 @@ async def handle_user_memory_requested(event: AgentEventEnvelope) -> None:
 
 
 async def handle_document_memory_observed(event: AgentEventEnvelope) -> None:
+    """Reconcile memory candidates observed from an active document projection.
+
+    The handler verifies projection availability and evidence provenance
+    before allowing document-derived memories to become durable.
+    """
     payload = _payload(DocumentMemoryObservedPayload, event)
     if event.knowledge_base_id is None:
         raise MalformedMemoryEvent("document memory observations require a knowledge base")
