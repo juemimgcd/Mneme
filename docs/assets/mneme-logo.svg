@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Mneme logo</title>
+  <desc id="desc">Two open memory vaults form an abstract M around a retained golden memory.</desc>
+  <path fill="none" stroke="#252E63" stroke-linecap="round" stroke-linejoin="round" stroke-width="52"
+        d="M96 400V234c0-92 96-118 160-52 64-66 160-40 160 52v166"/>
+  <path fill="none" stroke="#596BC7" stroke-linecap="round" stroke-linejoin="round" stroke-width="46"
+        d="M172 400V266c0-56 56-76 84-30 28-46 84-26 84 30v134"/>
+  <rect width="44" height="104" x="234" y="256" fill="#F4EFE6" rx="22"/>
+  <rect width="20" height="70" x="246" y="268" fill="#D99A34" rx="10"/>
+</svg>

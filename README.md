@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/mneme-logo.png" alt="Mneme logo" width="220">
+<img src="docs/assets/mneme-logo.svg" alt="Mneme logo" width="220">
 
 # Memoria
 
