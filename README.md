@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/mneme-logo.png" alt="Mneme logo" width="220">
+
 # Memoria
 
 ### The memory Agent at the heart of Mneme
