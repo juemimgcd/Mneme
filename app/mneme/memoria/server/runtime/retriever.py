@@ -1,3 +1,8 @@
+"""Retrieve scoped evidence from the sources selected by an answer-mode plan.
+
+Independent sources may degrade separately; successful rankings are fused without crossing owner scope.
+"""
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
@@ -15,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class ScopedEvidenceRetriever:
+    """Retrieve and fuse evidence allowed by a deterministic retrieval plan.
+
+    Each source receives the same owner and knowledge-base scope. A source
+    failure is logged and isolated; all-source failure remains terminal.
+    """
     def __init__(
         self,
         *,
@@ -29,6 +39,15 @@ class ScopedEvidenceRetriever:
         self._relations_factory = relations_factory
 
     async def retrieve(self, request: RetrievalRequest) -> list[RetrievedEvidence]:
+        """Execute selected evidence-source searches concurrently and fuse results.
+
+        Returns:
+            At most ``request.top_k`` normalized evidence items ordered by RRF.
+
+        Raises:
+            ValueError: If document retrieval lacks a knowledge-base scope.
+            Exception: The first source error when no source returns a ranking.
+        """
         if not request.plan.uses_private_sources:
             return []
 

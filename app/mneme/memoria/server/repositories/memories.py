@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria memories.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -26,6 +31,12 @@ def _knowledge_scope(column, knowledge_base_id: str | None):
 
 
 async def lock_memory_slot(db: AsyncSession, lock_key: int) -> None:
+    """Hold a transaction-scoped advisory lock for one logical memory slot.
+
+    The lock is released automatically with the caller's transaction and keeps
+    compatible/conflicting reconciliation decisions serializable.
+    """
+
     await db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": lock_key})
 
 
@@ -36,6 +47,8 @@ async def load_candidate_for_update(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> MemoryCandidate | None:
+    """Load and row-lock a candidate only when it belongs to the given scope."""
+
     return await db.scalar(
         select(MemoryCandidate)
         .where(
@@ -53,6 +66,8 @@ async def load_memory_for_update(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> CanonicalMemory | None:
+    """Load and row-lock a canonical memory within an owner/KB boundary."""
+
     return await db.scalar(
         select(CanonicalMemory)
         .where(
@@ -70,6 +85,8 @@ async def find_active_memory(
     knowledge_base_id: str | None,
     fingerprint: str,
 ) -> CanonicalMemory | None:
+    """Find the exact active memory fingerprint and lock it for reconciliation."""
+
     return await db.scalar(
         select(CanonicalMemory).where(
             *_scope(CanonicalMemory, owner_id, knowledge_base_id),
@@ -89,6 +106,8 @@ async def find_conflicting_memory(
     predicate: str,
     fingerprint: str,
 ) -> CanonicalMemory | None:
+    """Find a different active value occupying the same logical memory slot."""
+
     return await db.scalar(
         select(CanonicalMemory).where(
             *_scope(CanonicalMemory, owner_id, knowledge_base_id),
@@ -108,6 +127,12 @@ async def load_active_revision(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> MemoryRevision:
+    """Load the memory's open active revision and verify scope consistency.
+
+    A missing, closed, or cross-scope revision indicates a broken canonical
+    memory invariant and is reported instead of being treated as absent data.
+    """
+
     if memory.active_revision_id is None:
         raise ValueError("canonical memory has no active revision")
     revision = await db.scalar(
@@ -133,6 +158,8 @@ async def validate_evidence_scope(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> set[str]:
+    """Validate that every requested evidence ID exists in the caller's scope."""
+
     requested = set(evidence_ids)
     if not requested:
         return set()
@@ -158,6 +185,12 @@ async def attach_candidate_evidence(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> int:
+    """Idempotently attach scoped evidence to a candidate.
+
+    Returns the number of newly inserted associations; existing associations do
+    not count and do not raise because inbox events may be replayed.
+    """
+
     candidate = await load_candidate_for_update(
         db,
         candidate_id=candidate_id,
@@ -192,6 +225,8 @@ async def attach_revision_evidence(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> int:
+    """Idempotently attach scoped evidence to an existing memory revision."""
+
     revision = await db.scalar(
         select(MemoryRevision)
         .where(
@@ -228,6 +263,8 @@ async def candidate_evidence_ids(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> list[str]:
+    """Return evidence IDs for a candidate after verifying scoped ownership."""
+
     candidate = await load_candidate_for_update(
         db,
         candidate_id=candidate_id,
@@ -252,6 +289,13 @@ async def hard_delete_memory(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> bool:
+    """Delete a canonical memory and candidates tied to its revision history.
+
+    The active revision invariant is checked first. Candidates that conflict
+    with the memory or reuse any historical fingerprint are removed before the
+    ORM cascades delete revisions and the canonical row.
+    """
+
     memory = await load_memory_for_update(
         db,
         memory_id=memory_id,
@@ -291,8 +335,12 @@ async def hard_delete_memory(
 
 
 def new_id() -> str:
+    """Generate the compact UUID representation used by persistence models."""
+
     return uuid4().hex
 
 
 def utc_now() -> datetime:
+    """Return an aware UTC timestamp for persistence-layer defaults."""
+
     return datetime.now(timezone.utc)

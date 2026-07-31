@@ -1,3 +1,8 @@
+"""Coordinate Mneme-side Agent requests before they cross the Memoria service boundary.
+
+This layer resolves answer modes and context, but does not own online retrieval or model prompting.
+"""
+
 from typing import Any
 
 from langchain_core.output_parsers import PydanticOutputParser, StrOutputParser
@@ -24,14 +29,29 @@ EMPTY_EVIDENCE_ANSWER = (
 
 
 def is_retryable_external_error(exc: Exception) -> bool:
+    """Return whether an external failure is safe to retry automatically.
+
+    Only transport-like failures are retried. Validation, authorization, and
+    application errors must surface immediately because repeating an unchanged
+    request cannot make them succeed.
+    """
+
     return isinstance(exc, (TimeoutError, ConnectionError, OSError))
 
 
 def serialize_route(route: QueryRouteDecision) -> dict[str, Any]:
+    """Convert an internal route decision into the stable API response shape."""
+
     return route.model_dump()
 
 
 def build_action_request_answer(route: QueryRouteDecision) -> dict[str, Any]:
+    """Build a safe acknowledgement without executing the requested action.
+
+    Mneme's chat path is advisory: upload, deletion, and rebuild operations must
+    go through their dedicated product controls and authorization checks.
+    """
+
     return {
         "answer": (
             "This request needs to be completed through the corresponding system page or API. "
@@ -51,6 +71,12 @@ def build_action_request_answer(route: QueryRouteDecision) -> dict[str, Any]:
 
 
 def build_profile_answer(profile: dict[str, Any]) -> str:
+    """Render a profile snapshot deterministically from structured memory.
+
+    Deterministic formatting prevents an LLM from inventing unsupported traits
+    while keeping absent profile sections visible to the caller.
+    """
+
     themes = [
         item.get("theme_name")
         for item in profile.get("main_themes", [])
@@ -76,6 +102,8 @@ def build_profile_answer(profile: dict[str, Any]) -> str:
 
 
 def build_growth_answer(report: dict[str, Any]) -> str:
+    """Render the precomputed growth report without adding model inference."""
+
     lines = [
         report.get("stage_summary") or "No stable stage analysis is available yet.",
     ]
@@ -99,6 +127,13 @@ async def invoke_llm_answer(
     user_id: int | None = None,
     llm_config: dict | None = None,
 ) -> str:
+    """Generate a non-evidence answer with retry and circuit-breaker guards.
+
+    This helper is used only by conversational routes that do not claim facts
+    from stored evidence. Retrieval-backed answers use
+    :func:`invoke_evidence_answer` so citations can be validated.
+    """
+
     llm = get_llm_for_user_config(llm_config) if llm_config else get_llm()
     chain = prompt | llm | StrOutputParser()
 
@@ -162,6 +197,28 @@ async def generate_rag_answer(
     answer_mode: AnswerMode = "kb_qa",
     llm_config: dict | None = None,
 ) -> dict[str, Any]:
+    """Route a question through chat, profile, analysis, or evidence-backed RAG.
+
+    This Mneme-side compatibility entry point keeps non-memory routes separate
+    from retrieval. Memory-backed routes require a database session and return
+    only citations that resolve against the scoped source packet.
+
+    Args:
+        question: User-visible question to answer.
+        db: Database session required by profile, analysis, and retrieval modes.
+        knowledge_base_id: Knowledge-base boundary applied to all stored data.
+        user_id: Optional owner scope propagated into retrieval and logging.
+        top_k: Maximum number of final retrieval candidates.
+        answer_mode: Public mode used to select routing and retrieval scope.
+        llm_config: Optional per-user model configuration.
+
+    Returns:
+        API-ready answer data with route, evidence, confidence, and debug fields.
+
+    Raises:
+        ValueError: If a memory-backed route is selected without ``db``.
+    """
+
     route = route_answer_mode(answer_mode)
     log_event(
         "query_service",
@@ -176,6 +233,8 @@ async def generate_rag_answer(
         target_pipeline=route.target_pipeline,
     )
 
+    # These modes deliberately bypass retrieval: general chat makes no memory
+    # claim, while action requests must not produce side effects from chat.
     if route.query_type == "general_chat":
         log_event(
             "query_service",
@@ -299,6 +358,8 @@ async def generate_rag_answer(
     )
 
     if not context_packet["sources"]:
+        # Fail closed when no evidence is available. A fluent uncited answer
+        # would otherwise look indistinguishable from a remembered fact.
         debug_packet = context_packet["debug"]
         debug_packet["route"] = serialize_route(route)
         debug_packet["answer_debug"] = build_answer_debug(
@@ -368,10 +429,18 @@ async def generate_rag_answer(
 
 
 def resolve_citations(citation_drafts: list[EvidenceCitationDraft], sources: list[dict[str, Any]]) -> dict[str, Any]:
+    """Resolve model citations against the retrieved source allow-list.
+
+    Fabricated, malformed, and out-of-scope citation identifiers remain in the
+    validation result for diagnostics instead of becoming trusted references.
+    """
+
     return validate_citation_drafts(citation_drafts, sources)
 
 
 def get_evidence_prompt_for_mode(answer_mode: AnswerMode, format_instructions: str):
+    """Select the structured evidence prompt for the requested answer mode."""
+
     if answer_mode == "memory_query":
         return get_memory_rag_prompt(format_instructions)
     return get_evidence_rag_prompt(format_instructions)
@@ -387,6 +456,14 @@ async def invoke_evidence_answer(
     user_id: int | None = None,
     llm_config: dict | None = None,
 ) -> dict[str, Any]:
+    """Generate a structured answer and validate every citation before return.
+
+    The model receives only the already-scoped context packet. Its citation
+    drafts are matched back to that packet, and citation quality then adjusts
+    confidence and uncertainty so unsupported claims cannot silently appear as
+    high-confidence output.
+    """
+
     parser = PydanticOutputParser(pydantic_object=EvidenceAnswerDraft)
     prompt = get_evidence_prompt_for_mode(answer_mode, parser.get_format_instructions())
     llm = get_llm_for_user_config(llm_config) if llm_config else get_llm()

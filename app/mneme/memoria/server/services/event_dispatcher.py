@@ -1,3 +1,8 @@
+"""Dispatch validated inbox events to projection, memory, or deletion handlers.
+
+The dispatcher owns event-type routing while handlers own their transactional domain logic.
+"""
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -52,6 +57,13 @@ class EventProcessResult:
 
 
 async def handle_document_projection_upserted(event: AgentEventEnvelope) -> None:
+    """Validate, stage, and finalize one document-projection event.
+
+    Deletion fences suppress stale upserts that arrived after a document delete.
+    Incomplete multi-batch projections remain staged until a later batch makes
+    the projection complete.
+    """
+
     try:
         payload = DocumentProjectionPayload.model_validate(event.payload)
     except ValidationError as exc:
@@ -73,14 +85,20 @@ async def handle_document_projection_upserted(event: AgentEventEnvelope) -> None
 
 
 async def handle_conversation_completed(event: AgentEventEnvelope) -> None:
+    """Forward a completed conversation event to memory extraction."""
+
     await process_conversation_completed(event)
 
 
 async def handle_user_memory_requested(event: AgentEventEnvelope) -> None:
+    """Forward an explicit user memory request to the memory event service."""
+
     await process_user_memory_requested(event)
 
 
 async def handle_user_memory_settings_changed(event: AgentEventEnvelope) -> None:
+    """Apply owner-scoped changes to automatic memory settings."""
+
     await handle_memory_settings_changed(event)
 
 
@@ -97,12 +115,21 @@ EVENT_HANDLERS: dict[str, EventHandler] = {
 
 
 async def dispatch_inbox_event(event_id: str) -> EventProcessResult:
+    """Process one inbox event with tracing context and idempotent locking.
+
+    A concurrent worker that already owns the event lock causes ``skipped``;
+    terminal domain validation failures become ``failed``; transient/unexpected
+    failures remain retryable by leaving the inbox row pending.
+    """
+
     with observation_context(event_id=event_id):
         return await _dispatch_inbox_event(event_id)
 
 
 async def _dispatch_inbox_event(event_id: str) -> EventProcessResult:
     async with engine.connect() as connection:
+        # The event-level session lock prevents two workers from incrementing
+        # attempts or invoking the handler for the same inbox row concurrently.
         acquired = await connection.scalar(
             text("SELECT pg_try_advisory_lock(hashtextextended(:event_id, 1))"),
             {"event_id": event_id},
@@ -127,6 +154,8 @@ async def _dispatch_inbox_event(event_id: str) -> EventProcessResult:
                     event = AgentEventEnvelope.model_validate(row.payload)
 
                 try:
+                    # Serialize all memory mutations in one owner/KB scope. This
+                    # complements finer slot locks used inside reconciliation.
                     scope_identity = f"memory-scope:{event.owner_id}:{event.knowledge_base_id or '<global>'}"
                     await connection.execute(
                         text("SELECT pg_advisory_lock(hashtextextended(:identity, 3))"),
@@ -149,6 +178,8 @@ async def _dispatch_inbox_event(event_id: str) -> EventProcessResult:
                     SourceDeletionError,
                     TerminalExtractionError,
                 ) as exc:
+                    # These errors mean the event is permanently invalid. Mark
+                    # it terminal so retries cannot repeatedly consume capacity.
                     async with session.begin():
                         row = await session.scalar(
                             select(InboxEvent)
@@ -161,6 +192,9 @@ async def _dispatch_inbox_event(event_id: str) -> EventProcessResult:
                             row.last_error = f"event rejected: {exc}"[:2000]
                     return EventProcessResult(event_id=event_id, status="failed")
                 except Exception as exc:
+                    # Unexpected infrastructure failures keep status=pending;
+                    # the worker records a sanitized reason and lets the queue
+                    # retry according to its own backoff policy.
                     async with session.begin():
                         row = await session.scalar(
                             select(InboxEvent)

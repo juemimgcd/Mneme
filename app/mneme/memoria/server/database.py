@@ -1,3 +1,8 @@
+"""Implement Memoria database application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 

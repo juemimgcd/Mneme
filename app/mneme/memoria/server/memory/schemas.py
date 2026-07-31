@@ -1,3 +1,8 @@
+"""Define strict extraction and event payload schemas for the governed memory pipeline.
+
+Candidate evidence offsets and fixed memory types constrain untrusted model output.
+"""
+
 from datetime import datetime
 from typing import Literal
 

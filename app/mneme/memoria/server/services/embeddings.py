@@ -1,3 +1,8 @@
+"""Load the configured embedding model once and generate normalized vectors off the event loop.
+
+Dimension checks fail fast before incompatible vectors reach pgvector storage.
+"""
+
 import asyncio
 from functools import lru_cache
 from pathlib import Path
@@ -52,6 +57,11 @@ def _embed_texts_sync(texts: list[str]) -> list[list[float]]:
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Encode texts into normalized vectors without blocking the async event loop.
+
+    The result count and configured dimension are validated before vectors
+    are returned to projection or retrieval code.
+    """
     if not texts:
         return []
     return await asyncio.to_thread(_embed_texts_sync, texts)

@@ -1,3 +1,8 @@
+"""Implement durable Memoria automation behavior for outbox.
+
+Database state is authoritative; queue and outbox delivery may be retried without duplicating effects.
+"""
+
 import uuid
 
 from app.mneme.conf.database import open_write_session

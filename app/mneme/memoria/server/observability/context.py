@@ -1,3 +1,8 @@
+"""Expose privacy-safe observability helpers for Memoria context.
+
+Metrics and logs report bounded metadata without prompts, answers, evidence bodies, or secrets.
+"""
+
 import json
 import logging
 from typing import Any, Final

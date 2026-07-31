@@ -1,3 +1,8 @@
+"""Classify candidate sensitivity and detect secret-like values before memory persistence.
+
+Detection is a conservative policy boundary, not a general-purpose data-loss-prevention engine.
+"""
+
 import re
 
 from app.mneme.memoria.server.memory.schemas import SensitivitySignal
@@ -43,6 +48,11 @@ _SENSITIVE_PATTERNS = (
 
 
 def contains_secret(text: str) -> bool:
+    """Return whether text matches the conservative secret-detection boundary.
+
+    The check intentionally favors preventing persistence over recall of
+    secret-like strings and runs before external extraction calls.
+    """
     return any(pattern.search(text) is not None for pattern in _SECRET_PATTERNS)
 
 
@@ -50,6 +60,11 @@ def classify_sensitivity(
     *texts: str,
     model_signals: list[SensitivitySignal] | None = None,
 ) -> Sensitivity:
+    """Classify validated candidate text as low, sensitive, or secret.
+
+    The result feeds persistence policy; it is not a complete regulatory or
+    enterprise data-classification system.
+    """
     signals = set(model_signals or [])
     if any(contains_secret(text) for text in texts) or signals & _SECRET_SIGNALS:
         return "secret"

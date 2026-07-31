@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria health.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Annotated

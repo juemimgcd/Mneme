@@ -1,3 +1,8 @@
+"""Decide whether a memory candidate is promoted, held for review, or rejected.
+
+Secret sensitivity has absolute precedence; confidence, explicit intent, and conflicts govern other outcomes.
+"""
+
 from typing import Literal
 
 from app.mneme.memoria.server.models.memory_candidate import Sensitivity
@@ -13,6 +18,11 @@ def classify_candidate(
     explicit_request: bool = False,
     has_conflict: bool = False,
 ) -> PolicyDecision:
+    """Apply the persistence policy to a validated memory candidate.
+
+    Secret candidates are always rejected. Explicit user intent can promote
+    non-secret data; conflicts, sensitivity, and low confidence require review.
+    """
     if sensitivity not in {"low", "sensitive", "secret"}:
         raise ValueError("unsupported sensitivity")
     if sensitivity == "secret":

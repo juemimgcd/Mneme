@@ -1,3 +1,8 @@
+"""Map explicit answer modes to their allowed private evidence sources.
+
+Plans are deterministic policy: they bound retrieval rather than infer permissions from model output.
+"""
+
 from app.mneme.memoria.server.runtime.contracts import RetrievalPlan
 
 MODE_PLANS = {

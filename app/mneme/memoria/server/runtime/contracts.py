@@ -1,3 +1,8 @@
+"""Define internal contracts exchanged between Memoria runtime phases.
+
+The models make phase inputs, outputs, budgets, and terminal decisions explicit and validated.
+"""
+
 from datetime import datetime
 from typing import Any, Literal
 

@@ -1,3 +1,8 @@
+"""Construct evidence-grounded prompts for Memoria answer and review phases.
+
+Prompt builders enforce context budgets and keep conversation history distinct from citable evidence.
+"""
+
 import json
 
 from app.mneme.memoria.server.contracts.answers import ConversationContextData
@@ -36,6 +41,11 @@ def build_messages(
     tool_observations: str = "",
     grounding_requirement: GroundingRequirement | None = None,
 ) -> list[dict[str, str]]:
+    """Build provider messages from the question, bounded history, and evidence.
+
+    Retrieved evidence is labeled separately from conversation context so
+    prior assistant text cannot silently become citable support.
+    """
     output_contract = (
         'Return one JSON object with keys: "decision" ("tool", "continue", or "final"), '
         '"reasoning_summary" (short outcome-level string or null), "answer" (string), "citations" '

@@ -1,3 +1,8 @@
+"""Implement Memoria logging application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 import logging
 
 from app.mneme.memoria.server.observability.context import SafeJsonFormatter

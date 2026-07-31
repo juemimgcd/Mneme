@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria ai model config.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from sqlalchemy import BigInteger, Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 

@@ -1,3 +1,8 @@
+"""Define the catalog and safety metadata for Agent-proposed write actions.
+
+Catalog entries describe proposals only; approval does not imply that a mutation executor exists.
+"""
+
 from dataclasses import dataclass
 from enum import Enum
 

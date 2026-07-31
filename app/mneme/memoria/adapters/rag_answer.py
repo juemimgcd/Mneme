@@ -1,3 +1,8 @@
+"""Adapt Memoria rag answer calls across an external or architectural boundary.
+
+The adapter preserves validated contracts, scope, retries, and error classification.
+"""
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.mneme.memoria.contracts import AgentRequest, AgentResponse

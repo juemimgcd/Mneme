@@ -1,3 +1,8 @@
+"""Reconcile extracted candidates with canonical memories and immutable revision history.
+
+Slot locks, scoped evidence, fingerprints, and stale-candidate checks prevent lost updates and silent overwrites.
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -192,6 +197,12 @@ async def reconcile_candidate(
     explicit_request: bool = False,
     actor: str = "memory-policy",
 ) -> ReconciliationResult:
+    """Reconcile a candidate with compatible or conflicting canonical memory.
+
+    The transaction locks the logical slot, persists scoped evidence, merges
+    compatible support, or creates a pending conflict. Automatic promotion
+    creates an auditable canonical memory and initial revision.
+    """
     # Secret policy has absolute precedence, including over malformed confidence.
     preliminary_decision = classify_candidate(
         sensitivity=sensitivity,
@@ -213,6 +224,9 @@ async def reconcile_candidate(
         predicate=normalized_predicate,
         value=normalized_value,
     )
+    # The fingerprint identifies an exact fact; this broader slot lock
+    # serializes competing values for the same type/subject/predicate. Without
+    # it, concurrent workers could both create canonical rows for one slot.
     await lock_memory_slot(
         db,
         memory_slot_lock_key(
@@ -271,6 +285,8 @@ async def reconcile_candidate(
     evidence_ids = [item.evidence_id for item in stored_evidence]
 
     if decision == "promote" and compatible is not None:
+        # A retry or independent supporting source reinforces the active
+        # revision instead of creating a duplicate canonical memory.
         if compatible_revision is None:
             raise ValueError("canonical memory has no active revision")
         attached = await attach_revision_evidence(
@@ -289,6 +305,8 @@ async def reconcile_candidate(
             reinforced=attached > 0,
         )
 
+    # Persist every non-rejected extraction as a candidate, including automatic
+    # promotions, so provenance and the policy decision remain auditable.
     candidate = MemoryCandidate(
         candidate_id=new_id(),
         owner_id=owner_id,
@@ -321,6 +339,8 @@ async def reconcile_candidate(
         return ReconciliationResult(decision=decision, candidate=candidate)
 
     if conflict is not None:
+        # Only explicit requests can promote a conflicting value here. Normal
+        # automatic extraction leaves conflicts pending for user review.
         memory = await revise_memory(
             db,
             memory_id=conflict.memory_id,
@@ -368,6 +388,11 @@ async def revise_memory(
     confidence: float | None = None,
     sensitivity: Sensitivity = "low",
 ) -> CanonicalMemory:
+    """Replace the active value of a scoped memory by creating a new revision.
+
+    The previous revision receives ``valid_to`` before the new revision
+    becomes active, preserving temporal history and preventing in-place edits.
+    """
     if sensitivity == "secret":
         raise ValueError("secret values cannot be persisted as memory")
     if confidence is not None and not 0 <= confidence <= 1:
@@ -418,6 +443,9 @@ async def revise_memory(
     )
 
     now = utc_now()
+    # Close the previous validity interval before making the new revision
+    # active. Both writes share the caller's transaction, preventing readers
+    # from observing two current revisions.
     old_revision.valid_to = now
     await db.flush()
     fingerprint = memory_fingerprint(
@@ -465,6 +493,11 @@ async def confirm_candidate(
     knowledge_base_id: str | None,
     actor: str,
 ) -> CanonicalMemory:
+    """Promote a pending candidate after revalidating the current memory slot.
+
+    A candidate tied to an outdated conflicting revision is rejected as
+    stale so a delayed confirmation cannot overwrite newer user decisions.
+    """
     candidate = await load_candidate_for_update(
         db,
         candidate_id=candidate_id,
@@ -535,6 +568,9 @@ async def confirm_candidate(
                 owner_id=owner_id,
                 knowledge_base_id=knowledge_base_id,
             )
+            # Confirmation refers to the conflict revision the user reviewed.
+            # If the slot changed meanwhile, require fresh review instead of
+            # overwriting newer state with a stale candidate.
             if (
                 candidate.conflicting_memory_id != current_conflict.memory_id
                 or candidate.conflicting_revision_id != current_revision.revision_id
@@ -584,6 +620,11 @@ async def reject_candidate(
     owner_id: int,
     knowledge_base_id: str | None,
 ) -> MemoryCandidate:
+    """Mark a pending candidate rejected within its owner and KB scope.
+
+    Only pending candidates may transition, making repeated or stale command
+    attempts explicit instead of silently changing terminal state.
+    """
     candidate = await load_candidate_for_update(
         db,
         candidate_id=candidate_id,

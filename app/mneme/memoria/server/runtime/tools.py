@@ -1,3 +1,8 @@
+"""Validate and execute bounded Agent tool requests inside the answer runtime.
+
+Read tools inherit retrieval scope, while write tools remain proposal-only at this boundary.
+"""
+
 from __future__ import annotations
 
 import json
@@ -70,6 +75,11 @@ READ_TOOL_DEFINITIONS: dict[str, ToolDefinition] = {
 
 
 def available_tool_specs(context: ToolExecutionContext) -> list[dict[str, Any]]:
+    """Return tool schemas allowed by the current answer mode and execution context.
+
+    Availability is policy, not model preference: out-of-mode tools are
+    omitted before the model can request them.
+    """
     specs: list[dict[str, Any]] = []
     for definition in READ_TOOL_DEFINITIONS.values():
         if _source_allowed(context.plan, definition.source_type or ""):
@@ -98,6 +108,11 @@ def available_tool_specs(context: ToolExecutionContext) -> list[dict[str, Any]]:
 
 
 class ScopedToolExecutor:
+    """Execute allowlisted tools under owner, mode, call-count, and risk limits.
+
+    Read tools inherit the current retrieval scope. Write tools produce an
+    approval proposal only and cannot mutate domain state at this boundary.
+    """
     def __init__(self, retriever: EvidenceRetriever) -> None:
         self._retriever = retriever
 
@@ -108,6 +123,11 @@ class ScopedToolExecutor:
         context: ToolExecutionContext,
         tool_call_id: str,
     ) -> ToolExecution:
+        """Validate and execute one structured tool request.
+
+        Unknown tools, malformed arguments, scope expansion, and exhausted
+        budgets become bounded observations instead of unhandled model control.
+        """
         if request.name in WRITE_ACTION_CATALOG:
             if not context.allow_action_proposals:
                 definition = WRITE_ACTION_CATALOG[request.name]

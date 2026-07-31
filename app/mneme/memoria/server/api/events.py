@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria events.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any

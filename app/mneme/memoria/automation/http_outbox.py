@@ -1,3 +1,8 @@
+"""Implement durable Memoria automation behavior for http outbox.
+
+Database state is authoritative; queue and outbox delivery may be retried without duplicating effects.
+"""
+
 from typing import Any
 
 from pydantic import ValidationError

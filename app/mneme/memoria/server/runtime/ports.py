@@ -1,3 +1,8 @@
+"""Declare runtime ports for evidence retrieval, model generation, tools, and persistence.
+
+The orchestrator depends on these protocols instead of concrete database or provider implementations.
+"""
+
 from typing import Protocol
 
 from app.mneme.memoria.server.retrieval.contracts import RetrievedEvidence

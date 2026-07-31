@@ -1,3 +1,8 @@
+"""Translate Mneme memory operations into the independent Memoria service contract.
+
+The gateway preserves owner and knowledge-base scope across the HTTP boundary.
+"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4

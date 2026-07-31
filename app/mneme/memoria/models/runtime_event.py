@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria runtime event.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import JSON, BigInteger, DateTime, Index, Integer, String

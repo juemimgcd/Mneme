@@ -1,3 +1,8 @@
+"""Expose the public package surface for Memoria server models.
+
+Imports are intentionally kept small to avoid coupling package initialization to runtime dependencies.
+"""
+
 from app.mneme.memoria.server.models.answer_run import AnswerRun
 from app.mneme.memoria.server.models.base import Base
 from app.mneme.memoria.server.models.canonical_memory import CanonicalMemory

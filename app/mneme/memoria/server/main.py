@@ -1,3 +1,8 @@
+"""Implement Memoria main application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 import uvicorn
 
 from app.mneme.memoria.server.app import create_memory_agent_app

@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria runs.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 from datetime import UTC, datetime
 from decimal import Decimal
 

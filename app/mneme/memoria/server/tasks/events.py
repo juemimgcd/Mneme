@@ -1,3 +1,8 @@
+"""Provide Celery task entry points for Memoria events.
+
+Tasks are thin synchronous wrappers around replay-safe asynchronous application services.
+"""
+
 import asyncio
 import logging
 from dataclasses import asdict

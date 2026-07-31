@@ -1,3 +1,8 @@
+"""Implement the capability-limited base class for source-specific retrieval roles.
+
+A role can narrow a plan and call a retriever; it has no API for spawning roles or mutating state.
+"""
+
 import asyncio
 from time import perf_counter
 
@@ -10,6 +15,11 @@ from app.mneme.memoria.server.runtime.ports import EvidenceRetriever
 
 
 class SourceRetrievalAgent:
+    """Capability-limited wrapper around one assigned evidence source.
+
+    The role may narrow the parent plan and call the injected retriever. It
+    cannot create child roles, invoke write tools, or widen authorization.
+    """
     def __init__(self, *, assignment: SourceAssignment, retriever: EvidenceRetriever) -> None:
         self.assignment = assignment
         self._retriever = retriever
@@ -20,6 +30,11 @@ class SourceRetrievalAgent:
         *,
         timeout_seconds: float,
     ) -> EvidenceBundle:
+        """Execute the assigned source under the smaller of source and global timeouts.
+
+        A successful empty result becomes a degraded bundle, preserving the
+        distinction between no evidence and an execution exception.
+        """
         started = perf_counter()
         scoped_request = request.model_copy(
             update={

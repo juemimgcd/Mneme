@@ -1,3 +1,8 @@
+"""Expose the public package surface for Memoria subscribers.
+
+Imports are intentionally kept small to avoid coupling package initialization to runtime dependencies.
+"""
+
 from app.mneme.memoria.subscribers.contracts import (
     RuntimeSubscriber,
     RuntimeSubscriberEvent,

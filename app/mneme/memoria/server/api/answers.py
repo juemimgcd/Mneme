@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria answers.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 import asyncio
 import json
 from typing import Annotated, Any, AsyncIterator
@@ -24,6 +29,7 @@ router = APIRouter()
 
 
 def get_memory_agent() -> MemoryAgent:
+    """Assemble request-scoped runtime dependencies for the Answer API."""
     retriever = ScopedEvidenceRetriever()
     return MemoryAgent(
         retriever=retriever,
@@ -52,6 +58,7 @@ async def create_answer(
     claims: Annotated[dict[str, Any], Depends(require_service_scope(ANSWERS_WRITE_SCOPE))],
     agent: Annotated[MemoryAgent, Depends(get_memory_agent)],
 ) -> AnswerResponse:
+    """Create or replay one idempotent answer after service-scope validation."""
     require_claimed_scope(
         claims,
         owner_id=request.owner_id,
@@ -75,6 +82,12 @@ async def stream_answer(
     claims: Annotated[dict[str, Any], Depends(require_service_scope(ANSWERS_WRITE_SCOPE))],
     agent: Annotated[MemoryAgent, Depends(get_memory_agent)],
 ) -> StreamingResponse:
+    """Stream phase telemetry followed by chunks of the validated final answer.
+
+    The background runtime writes into a bounded in-process queue. Answer deltas
+    are emitted only after ``MemoryAgent.run`` has completed citation validation;
+    early events therefore describe progress, not uncommitted answer content.
+    """
     require_claimed_scope(
         claims,
         owner_id=request.owner_id,

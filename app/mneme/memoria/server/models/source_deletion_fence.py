@@ -1,3 +1,8 @@
+"""Define SQLAlchemy persistence models for Memoria source deletion fence.
+
+This module describes storage shape and indexes; lifecycle rules remain in domain services.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, Index, String, func

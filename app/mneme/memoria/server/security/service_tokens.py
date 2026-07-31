@@ -1,3 +1,8 @@
+"""Enforce Memoria service-boundary security for service tokens.
+
+Authentication establishes trusted caller identity before owner and knowledge-base scope is accepted.
+"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

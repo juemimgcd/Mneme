@@ -1,3 +1,8 @@
+"""Implement Memoria celery app application behavior.
+
+The module keeps orchestration policy explicit and delegates persistence and external effects through boundaries.
+"""
+
 from celery import Celery
 from celery.signals import after_setup_logger, after_setup_task_logger, worker_process_init
 

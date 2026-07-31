@@ -1,3 +1,8 @@
+"""Apply scoped deletion events and prevent late projections from resurrecting removed data.
+
+Deletion fences and transactional cleanup preserve ordering across replayed or delayed events.
+"""
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -134,6 +139,12 @@ async def delete_source_evidence(
     projection_ids: set[str] | None = None,
     evidence_ids_to_delete: set[str] | None = None,
 ) -> DeletionResult:
+    """Delete scoped evidence and repair every memory derived from it.
+
+    Candidate/revision join rows are traced before deletion, affected logical
+    memory slots are locked, and canonical memories are either recalculated from
+    surviving revisions or removed. The caller owns the surrounding transaction.
+    """
     if not delete_entire_scope and (
         not source_ids and source_document_id is None and not evidence_ids_to_delete
     ):
@@ -414,6 +425,12 @@ async def delete_document_projection(
     knowledge_base_id: str,
     document_id: str,
 ) -> DeletionResult:
+    """Delete all projection versions and derived evidence for one document.
+
+    Projection rows are locked first, then chunk and batch identities are used
+    to find all downstream evidence. Cleanup and memory repair share the caller's
+    transaction so a document cannot disappear while its derived facts remain.
+    """
     projections = list(
         await db.scalars(
             select(DocumentProjection)
@@ -473,6 +490,7 @@ def _validate_scope(event: AgentEventEnvelope, payload) -> None:
 
 
 async def handle_document_deleted(event: AgentEventEnvelope) -> DeletionResult:
+    """Apply an idempotent document-deletion event and advance its fence."""
     try:
         payload = DocumentDeletedPayload.model_validate(event.payload)
     except ValueError as exc:
@@ -513,6 +531,7 @@ async def handle_document_deleted(event: AgentEventEnvelope) -> DeletionResult:
 
 
 async def handle_knowledge_base_deleted(event: AgentEventEnvelope) -> DeletionResult:
+    """Delete an entire knowledge-base projection and memory scope atomically."""
     try:
         payload = KnowledgeBaseDeletedPayload.model_validate(event.payload)
     except ValueError as exc:
@@ -561,6 +580,11 @@ async def handle_knowledge_base_deleted(event: AgentEventEnvelope) -> DeletionRe
 
 
 async def handle_conversation_deleted(event: AgentEventEnvelope) -> DeletionResult:
+    """Delete conversation-derived evidence and fence late message events.
+
+    Explicit-memory requests tied to deleted messages receive their own fences
+    so delayed request events cannot recreate memories after conversation purge.
+    """
     try:
         payload = ConversationDeletedPayload.model_validate(event.payload)
     except ValueError as exc:

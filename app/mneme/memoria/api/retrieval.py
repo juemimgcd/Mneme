@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria retrieval.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 

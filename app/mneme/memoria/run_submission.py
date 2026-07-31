@@ -1,3 +1,8 @@
+"""Create durable Agent runs and enqueue them after the database commit boundary.
+
+Submission is idempotent per request identity and never treats queue delivery as durable state.
+"""
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.mneme.memoria.events import AgentEvent
@@ -14,6 +19,8 @@ async def submit_agent_run(db: AsyncSession, record: AgentRunRecord) -> tuple[Ag
     """
     durable, durable_created = await create_or_get_durable_run(db, record)
     durable_record = durable_run_to_record(durable)
+    # Queue publication happens only after this commit. If publication fails,
+    # stale-run recovery can still discover and re-enqueue the PostgreSQL row.
     await db.commit()
     if durable_record.status in TERMINAL_AGENT_RUN_STATUSES:
         if await agent_run_store.get(durable_record.run_id) is None:
@@ -35,6 +42,8 @@ async def submit_agent_run(db: AsyncSession, record: AgentRunRecord) -> tuple[Ag
             ),
         )
     if cached_record.status == AgentRunStatus.QUEUED:
+        # Import lazily so API-only and persistence processes do not initialize
+        # Celery merely by importing the submission service.
         from app.mneme.infra.task_queue import enqueue_agent_run_task
 
         enqueue_agent_run_task(run_id=cached_record.run_id)

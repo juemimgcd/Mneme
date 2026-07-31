@@ -1,3 +1,8 @@
+"""Build bounded conversation context for Memoria answer requests.
+
+Compaction preserves a watermark and excludes prior assistant text from the evidence boundary.
+"""
+
 import math
 import re
 from dataclasses import dataclass
@@ -86,6 +91,15 @@ def assemble_critical_context(
     token_budget: int,
     chars_per_token: float,
 ) -> CriticalContextAssembly:
+    """Assemble the highest-priority context that fits the configured budget.
+
+    Sources are sanitized, ordered by policy, and either included or
+    rejected with a reason. The report is safe to persist because it
+    contains identifiers and sizes rather than private source text.
+
+    Returns:
+        The bounded context text together with a per-source decision report.
+    """
     safe_chars_per_token = max(1.0, min(chars_per_token, 8.0))
     safe_token_budget = max(0, token_budget)
     remaining_chars = min(20_000, int(safe_token_budget * safe_chars_per_token))
@@ -145,6 +159,12 @@ def assemble_critical_context(
 
 
 def sanitize_context_text(value: str) -> str:
+    """Normalize untrusted context before it enters a model prompt.
+
+    Control characters and excessive whitespace are removed while
+    preserving reader-visible content. This is formatting hygiene rather
+    than a substitute for prompt-injection defenses or source authorization.
+    """
     normalized = " ".join(value.split())
     normalized = _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}=[REDACTED]", normalized)
     normalized = _BEARER_RE.sub("Bearer [REDACTED]", normalized)

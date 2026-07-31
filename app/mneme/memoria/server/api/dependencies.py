@@ -1,3 +1,8 @@
+"""Expose FastAPI endpoints for Memoria dependencies.
+
+Route handlers validate transport input and delegate scoped business changes to services or repositories.
+"""
+
 from typing import Annotated, Any
 
 import jwt

@@ -1,3 +1,8 @@
+"""Provide command-line operations for Memoria backfill.
+
+Commands reuse production services and make destructive or resumable behavior explicit.
+"""
+
 import argparse
 import asyncio
 import hashlib

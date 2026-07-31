@@ -1,3 +1,8 @@
+"""Define Mneme-side contracts shared by Agent orchestration ports and adapters.
+
+These models keep transport, persistence, and runtime implementations replaceable.
+"""
+
 import uuid
 from typing import Any, Literal
 
@@ -19,6 +24,11 @@ class AgentHistoryMessage(BaseModel):
 
 
 class AgentRequest(BaseModel):
+    """Validated input accepted by the Mneme-side Agent orchestration layer.
+
+    The request carries explicit user, session, answer-mode, and bounded
+    context data. Transport adapters must not infer missing permissions.
+    """
     question: str
     knowledge_base_id: str | None = Field(default=None, min_length=1)
     user_id: int
@@ -42,6 +52,11 @@ class AgentRequest(BaseModel):
 
 
 class AgentResponse(BaseModel):
+    """Stable Agent result returned to chat, automation, and API callers.
+
+    The contract separates answer text, citations, uncertainty, runtime
+    metadata, and proposed actions so callers can persist them safely.
+    """
     answer: str
     sources: list[dict[str, Any]] = Field(default_factory=list)
     citations: list[dict[str, Any]] = Field(default_factory=list)

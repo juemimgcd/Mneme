@@ -1,3 +1,8 @@
+"""Configure Memoria repository behavior and validate its startup policy.
+
+Secrets remain environment-backed while checked-in configuration owns reproducible Agent behavior.
+"""
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 

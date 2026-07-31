@@ -1,3 +1,8 @@
+"""Provide scoped persistence operations for Memoria runtime events.
+
+Callers own transaction boundaries; repository queries preserve user scope and row-locking requirements.
+"""
+
 from uuid import uuid4
 
 from sqlalchemy import select

@@ -1,3 +1,8 @@
+"""Run the independent Memoria answer pipeline as explicit, observable phases.
+
+Retrieval, reasoning, generation, citation validation, budgets, and persistence share one failure boundary.
+"""
+
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
@@ -131,6 +136,12 @@ def _validate_request(request: AnswerRequest) -> RetrievalPlan:
 
 
 class MemoryAgent:
+    """Orchestrate one Memoria answer as a sequence of bounded runtime phases.
+
+    The class owns retrieval, optional Multi-Agent execution, reasoning,
+    generation, citation validation, run persistence, and public phase
+    events. Dependencies are injected so each boundary can fail explicitly.
+    """
     def __init__(
         self,
         *,
@@ -160,6 +171,11 @@ class MemoryAgent:
         )
 
     async def get_run(self, run_id: str) -> AnswerRunData:
+        """Load a previously persisted answer run by its public identifier.
+
+        The repository remains the source of truth for replay and inspection;
+        no process-local cache is treated as durable state.
+        """
         return await self._runs.get(run_id)
 
     async def _record_failure(
@@ -246,6 +262,13 @@ class MemoryAgent:
         *,
         event_callback: RunEventCallback | None = None,
     ) -> AnswerResponse:
+        """Execute or replay an idempotent answer request.
+
+        The request is validated before persistence, each phase runs under its
+        own timeout, and the final answer is returned only after citations and
+        budgets are checked. A repeated completed request returns stored output
+        instead of invoking providers again.
+        """
         validate_started = perf_counter()
         try:
             async with asyncio.timeout(self._timeouts.validate):
@@ -260,6 +283,9 @@ class MemoryAgent:
             request=request,
             validation_duration_ms=_elapsed_ms(validate_started),
         )
+        # ``create`` is idempotent on the external request identity. A different
+        # run ID therefore means this request was already accepted by another
+        # attempt; only a completed response is safe to replay.
         if isinstance(persisted_run, AnswerRunData) and persisted_run.run_id != run_id:
             if persisted_run.status == "completed" and persisted_run.response_json is not None:
                 await _emit_run_event(event_callback, "complete", "replayed", persisted_run.run_id)
@@ -418,6 +444,9 @@ class MemoryAgent:
                             model=request.model,
                             allow_model_fallback=request.allow_model_fallback,
                             tool_context=(
+                                # Multi-Agent retrieval has already consumed the
+                                # source-selection and retrieval budget. Disabling
+                                # tools prevents an unaccounted second retrieval path.
                                 None
                                 if multi_agent_result
                                 else ToolExecutionContext(
@@ -465,6 +494,9 @@ class MemoryAgent:
                 )
                 raise AnswerRunExecutionError(run_id=run_id, error_code=code) from None
 
+            # Tool evidence enters the same citation boundary as initial
+            # retrieval. Deduplicating by evidence ID prevents a tool from
+            # increasing apparent support by returning an existing source.
             for item in generated.tool_evidence:
                 if all(existing.evidence_id != item.evidence_id for existing in evidence):
                     evidence.append(item)
@@ -636,6 +668,8 @@ class MemoryAgent:
                 degraded=generated.degraded,
                 run_id=run_id,
             )
+            # Persist the validated response before emitting completion. A
+            # reconnecting client can then replay the same durable response.
             await self._runs.complete(
                 run_id,
                 citation_duration_ms=citation_duration_ms,

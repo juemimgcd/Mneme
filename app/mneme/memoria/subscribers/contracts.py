@@ -1,3 +1,8 @@
+"""Coordinate Memoria domain-event subscribers for contracts.
+
+Subscriber registration is code-owned and delivery remains scoped, idempotent, and observable.
+"""
+
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
