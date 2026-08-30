@@ -26,6 +26,15 @@ SensitivitySignal = Literal[
     "health",
     "finance",
     "authentication",
+    "political_belief",
+    "religious_belief",
+    "sexual_orientation",
+    "race_ethnicity",
+    "trade_union",
+    "minor",
+    "precise_location",
+    "biometric",
+    "genetic",
     "credential",
     "secret",
     "password",
@@ -134,4 +143,11 @@ class DocumentMemoryObservedPayload(BaseModel):
 class MemorySettingsChangedPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    automatic_conversation_memory: bool
+    automatic_conversation_memory: bool | None = None
+    ad_personalization_enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def require_one_setting(self) -> "MemorySettingsChangedPayload":
+        if self.automatic_conversation_memory is None and self.ad_personalization_enabled is None:
+            raise ValueError("at least one memory setting is required")
+        return self

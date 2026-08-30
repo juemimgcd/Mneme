@@ -15,7 +15,7 @@ from app.mneme.memoria.server.memory.reconciliation import confirm_candidate, re
 from app.mneme.memoria.server.models.canonical_memory import CanonicalMemory
 from app.mneme.memoria.server.models.evidence import Evidence, revision_evidence
 from app.mneme.memoria.server.models.memory_audit import MemoryActionAudit
-from app.mneme.memoria.server.models.memory_candidate import MemoryCandidate
+from app.mneme.memoria.server.models.memory_candidate import MemoryCandidate, Sensitivity
 from app.mneme.memoria.server.models.memory_revision import MemoryRevision
 from app.mneme.memoria.server.repositories.memories import (
     hard_delete_memory,
@@ -180,6 +180,7 @@ async def revise(
     predicate: str,
     value: str,
     confidence: float | None,
+    sensitivity: Sensitivity,
     actor_id: str,
     reason: str,
 ) -> CanonicalMemory:
@@ -224,6 +225,7 @@ async def revise(
         predicate=predicate,
         value=value,
         confidence=confidence,
+        sensitivity=sensitivity,
         actor=actor_id,
         reason=reason,
     )

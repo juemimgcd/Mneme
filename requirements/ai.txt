@@ -18,6 +18,7 @@ sympy==1.14.0
 threadpoolctl==3.6.0
 tiktoken==0.12.0
 tokenizers==0.22.2
-torch @ https://download.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl
+torch @ https://download.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; platform_machine == "x86_64"
+torch @ https://download.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl ; platform_machine == "aarch64"
 tqdm==4.67.3
 transformers==5.5.0

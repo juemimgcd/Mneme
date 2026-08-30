@@ -15,6 +15,7 @@ ANSWERS_WRITE_SCOPE = "answers:write"
 RUNS_READ_SCOPE = "runs:read"
 MEMORIES_READ_SCOPE = "memories:read"
 MEMORIES_WRITE_SCOPE = "memories:write"
+AD_RECOMMENDATIONS_SCOPE = "ads:recommend"
 SERVICE_TOKEN_ALGORITHM = "HS256"
 
 

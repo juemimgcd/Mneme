@@ -28,6 +28,7 @@ class MemoryData(BaseModel):
     predicate: str
     value: str
     confidence: float
+    sensitivity: str
     status: MemoryStatus
     created_at: datetime
     updated_at: datetime

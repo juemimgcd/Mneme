@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.mneme.memoria.server.models.base import Base
 
 MemoryStatus = Literal["active", "superseded", "invalidated"]
+CanonicalSensitivity = Literal["unknown", "low", "sensitive"]
 
 
 class CanonicalMemory(Base):
@@ -34,6 +35,10 @@ class CanonicalMemory(Base):
         CheckConstraint(
             "status IN ('active', 'superseded', 'invalidated')",
             name="ck_canonical_memories_status",
+        ),
+        CheckConstraint(
+            "sensitivity IN ('unknown', 'low', 'sensitive')",
+            name="ck_canonical_memories_sensitivity",
         ),
         CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_canonical_memories_confidence"),
         ForeignKeyConstraint(
@@ -70,6 +75,7 @@ class CanonicalMemory(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    sensitivity: Mapped[str] = mapped_column(String(16), nullable=False, default="unknown", server_default="unknown")
     retrieval_weight: Mapped[float] = mapped_column(Float, nullable=False, server_default="1")
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     active_revision_id: Mapped[str] = mapped_column(String(64), nullable=False)

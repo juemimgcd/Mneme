@@ -18,7 +18,7 @@ from app.mneme.memoria.server.memory.identity import (
     normalize_memory_text,
 )
 from app.mneme.memoria.server.memory.policy import PolicyDecision, classify_candidate
-from app.mneme.memoria.server.models.canonical_memory import CanonicalMemory
+from app.mneme.memoria.server.models.canonical_memory import CanonicalMemory, CanonicalSensitivity
 from app.mneme.memoria.server.models.evidence import Evidence
 from app.mneme.memoria.server.models.memory_candidate import (
     MEMORY_TYPES,
@@ -125,6 +125,11 @@ def _combined_confidence(current: float, additional: float) -> float:
     return min(1.0, 1.0 - ((1.0 - current) * (1.0 - additional)))
 
 
+def _combined_sensitivity(current: str, additional: Sensitivity) -> CanonicalSensitivity:
+    rank = {"low": 0, "unknown": 1, "sensitive": 2}
+    return max((current, additional), key=rank.__getitem__)  # type: ignore[return-value]
+
+
 async def _create_memory(
     db: AsyncSession,
     *,
@@ -136,6 +141,7 @@ async def _create_memory(
     value: str,
     fingerprint: str,
     confidence: float,
+    sensitivity: Sensitivity,
     reason: str,
     actor: str,
     evidence_ids: list[str],
@@ -152,6 +158,7 @@ async def _create_memory(
         value=value,
         fingerprint=fingerprint,
         confidence=confidence,
+        sensitivity=sensitivity,
         status="active",
         active_revision_id=revision_id,
     )
@@ -298,6 +305,7 @@ async def reconcile_candidate(
         )
         if attached:
             compatible.confidence = _combined_confidence(compatible.confidence, confidence)
+            compatible.sensitivity = _combined_sensitivity(compatible.sensitivity, sensitivity)
             await db.flush()
         return ReconciliationResult(
             decision="promote",
@@ -366,6 +374,7 @@ async def reconcile_candidate(
             value=normalized_value,
             fingerprint=fingerprint,
             confidence=confidence,
+            sensitivity=sensitivity,
             reason="explicit_request" if explicit_request else "automatic_promotion",
             actor=actor,
             evidence_ids=evidence_ids,
@@ -384,9 +393,9 @@ async def revise_memory(
     value: str,
     reason: str,
     actor: str,
+    sensitivity: Sensitivity,
     evidence_ids: list[str] | None = None,
     confidence: float | None = None,
-    sensitivity: Sensitivity = "low",
 ) -> CanonicalMemory:
     """Replace the active value of a scoped memory by creating a new revision.
 
@@ -477,6 +486,7 @@ async def revise_memory(
     memory.predicate = normalized_predicate
     memory.value = normalized_value
     memory.fingerprint = fingerprint
+    memory.sensitivity = sensitivity
     memory.active_revision_id = revision.revision_id
     memory.status = "active"
     if confidence is not None:
@@ -550,6 +560,9 @@ async def confirm_candidate(
             compatible.confidence = _combined_confidence(
                 compatible.confidence, candidate.confidence
             )
+            compatible.sensitivity = _combined_sensitivity(
+                compatible.sensitivity, candidate.sensitivity
+            )
         memory = compatible
     else:
         current_conflict = await find_conflicting_memory(
@@ -603,6 +616,7 @@ async def confirm_candidate(
                 value=candidate.value,
                 fingerprint=candidate.fingerprint,
                 confidence=candidate.confidence,
+                sensitivity=candidate.sensitivity,
                 reason="user_confirmation",
                 actor=actor,
                 evidence_ids=evidence_ids,

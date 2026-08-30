@@ -161,6 +161,25 @@ runtime uses the original bounded conversation context rather than sending an em
 - Generated answers record selected provider/model, attempts, fallback use, token usage, stop
   reason and degraded multi-agent state where applicable.
 
+## Ad recommendation
+
+- `POST /v1/ad-recommendations` requires the `ads:recommend` service scope and an exact matching
+  owner and optional knowledge-base claim.
+- The caller supplies already eligible candidates; Memoria does not decide campaign, budget,
+  geographic, frequency, or inventory eligibility.
+- Personalization is disabled by default and reads only active `preference` memories whose
+  canonical sensitivity is `low`. Political or religious beliefs, sexual orientation, race or
+  ethnicity, trade-union membership, minor status, precise location, biometric and genetic data
+  are sensitive and ineligible. Historical or unclassified memories remain `unknown` and are
+  ineligible until reclassified.
+- The response contains ranked ad IDs, scores, and candidate-owned matched tags. It never returns
+  memory text or document evidence.
+- Disabled consent, no eligible preference, or embedding failure produces a deterministic
+  business-score fallback with `personalized=false`.
+- `user.memory_settings.changed` accepts optional partial updates so older queued events remain
+  valid; omitted settings retain their current value. Each setting keeps an independent event
+  order so a delayed consent revocation cannot be discarded by a newer unrelated setting change.
+
 ## Tools and approvals
 
 Tool execution is bounded by `app/mneme/memoria/server/runtime/tools.py`.

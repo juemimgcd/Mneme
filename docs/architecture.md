@@ -59,6 +59,7 @@ retrieval, generation and citation phases.
 Responsibilities:
 
 - retrieve owner-scoped document, memory, profile and relation evidence;
+- rerank caller-supplied eligible ads from explicitly enabled, low-sensitivity preferences;
 - execute bounded single-agent or multi-agent reasoning;
 - expose only approval proposals for write-class tools;
 - call the configured primary model and optional fallback model;
@@ -113,6 +114,14 @@ Document mutations and memory-relevant domain events are committed with an Outbo
 loads a snapshot, dispatches by target backend, records retry state, and moves exhausted work to a
 dead-letter state. Projection consumers are idempotent and must remain rebuildable from the
 PostgreSQL source records.
+
+### Ad recommendation
+
+Mneme owns the call boundary; it receives campaign-eligible candidates from its ad source and
+supplies them to `POST /v1/ad-recommendations`. Memoria checks the owner-scoped setting and reranks
+only from active, low-sensitivity preference memories. Disabled consent, missing preferences, or an
+embedding failure returns the candidates in business-score order with `personalized=false`.
+Memoria does not own campaigns, impressions, clicks, budgets, or landing-page content.
 
 ### Run control
 

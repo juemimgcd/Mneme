@@ -13,6 +13,8 @@ import jwt
 
 from app.mneme.conf.config import settings
 from app.mneme.memoria.schemas.memory_agent import (
+    AdRecommendationRequest,
+    AdRecommendationResponse,
     CanonicalMemoryData,
     ConversationMemorySettingsData,
     EventReceipt,
@@ -115,6 +117,22 @@ class MemoryAgentClient:
             return MemoryAgentAnswerResponse.model_validate(response.json())
         except ValueError as exc:
             raise MemoryAgentPermanentFailure("memory agent returned an invalid answer response") from exc
+
+    async def recommend_ads(self, request: AdRecommendationRequest) -> AdRecommendationResponse:
+        """Rerank caller-filtered ads without exposing governed memory content."""
+        response = await self._post_json(
+            path="/v1/ad-recommendations",
+            payload=request.model_dump(mode="json"),
+            request_id=request.request_id,
+            scope="ads:recommend",
+            owner_id=request.owner_id,
+            knowledge_base_id=request.knowledge_base_id,
+            retry_transient=True,
+        )
+        try:
+            return AdRecommendationResponse.model_validate(response.json())
+        except ValueError as exc:
+            raise MemoryAgentPermanentFailure("memory agent returned an invalid ad recommendation") from exc
 
     async def stream_answer(self, request: MemoryAgentAnswerRequest) -> AsyncIterator[MemoryAgentStreamEvent]:
         """Yield validated events from the Memoria answer stream.
