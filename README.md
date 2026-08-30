@@ -122,6 +122,8 @@ cd Mneme
 cp .env-example .env
 ```
 
+Windows PowerShell：
+
 ```powershell
 # Windows PowerShell
 Copy-Item .env-example .env
@@ -404,6 +406,8 @@ CI 会分别执行前端、后端和集成检查；只有三个阶段全部通�
 | [Exception Boundaries](docs/exception-boundaries.md) | 异常分类、传播与恢复约束 |
 | [Operations Runbook](docs/operations-runbook.md) | 监控、告警、备份、恢复与故障处理 |
 | [Deployment](deploy/DEPLOY.md) | 生产部署、发布、回滚及 Memoria 运维 |
+
+规范路径：[docs/architecture.md](docs/architecture.md)、[docs/runtime-contracts.md](docs/runtime-contracts.md)、[docs/current-state.md](docs/current-state.md)。
 
 ## 参与贡献
 

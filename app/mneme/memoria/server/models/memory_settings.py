@@ -18,8 +18,15 @@ class MemorySettings(Base):
     automatic_conversation_memory: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    ad_personalization_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     last_event_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_event_id: Mapped[str | None] = mapped_column(String(128))
+    ad_personalization_last_event_occurred_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    ad_personalization_last_event_id: Mapped[str | None] = mapped_column(String(128))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

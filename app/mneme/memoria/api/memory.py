@@ -314,5 +314,10 @@ async def patch_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_write_database),
 ):
-    data = await service.update_settings(db, owner_id=current_user.id, enabled=payload.automatic_conversation_memory)
+    data = await service.update_settings(
+        db,
+        owner_id=current_user.id,
+        automatic_conversation_memory=payload.automatic_conversation_memory,
+        ad_personalization_enabled=payload.ad_personalization_enabled,
+    )
     return success_response(data=data, message="memory settings accepted")

@@ -17,7 +17,6 @@ from app.mneme.domains.tasks.outbox import enqueue_user_memory_settings_changed
 from app.mneme.memoria.clients.memory_agent import MemoryAgentClient
 from app.mneme.memoria.schemas.memory_agent import (
     CanonicalMemoryData,
-    ConversationMemorySettingsData,
     GovernedMemoryPage,
     MemoryCandidateData,
     MemoryCandidatePage,
@@ -293,11 +292,29 @@ async def list_candidates(
     return MemoryCandidatePage(items=items, next_cursor=next_cursor, total=total, pending_count=total)
 
 
-async def update_settings(db: AsyncSession, *, owner_id: int, enabled: bool) -> ConversationMemorySettingsData:
+async def update_settings(
+    db: AsyncSession,
+    *,
+    owner_id: int,
+    automatic_conversation_memory: bool | None,
+    ad_personalization_enabled: bool | None,
+) -> dict[str, bool]:
     await enqueue_user_memory_settings_changed(
-        db, owner_id=owner_id, automatic_conversation_memory=enabled, occurred_at=datetime.now(UTC)
+        db,
+        owner_id=owner_id,
+        automatic_conversation_memory=automatic_conversation_memory,
+        ad_personalization_enabled=ad_personalization_enabled,
+        occurred_at=datetime.now(UTC),
     )
-    return ConversationMemorySettingsData(automatic_conversation_memory=enabled, applied=False)
+    return {
+        key: value
+        for key, value in {
+            "automatic_conversation_memory": automatic_conversation_memory,
+            "ad_personalization_enabled": ad_personalization_enabled,
+            "applied": False,
+        }.items()
+        if value is not None
+    }
 
 
 def _secret() -> str:

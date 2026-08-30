@@ -41,6 +41,7 @@ class CanonicalMemoryDTO(BaseModel):
     predicate: str
     value: str
     confidence: float
+    sensitivity: str
     status: str
     active_revision_id: str
     created_at: datetime
@@ -309,6 +310,7 @@ async def get_memory_settings(
         row = await db.get(MemorySettings, owner_id)
     return {
         "automatic_conversation_memory": bool(row and row.automatic_conversation_memory),
+        "ad_personalization_enabled": bool(row and row.ad_personalization_enabled),
         "applied": row is not None,
     }
 
@@ -371,7 +373,8 @@ async def command_memory(
                 )
             else:
                 assert command.subject is not None and command.predicate is not None and command.value is not None
-                if classify_sensitivity(command.subject, command.predicate, command.value) == "secret":
+                sensitivity = classify_sensitivity(command.subject, command.predicate, command.value)
+                if sensitivity == "secret":
                     raise ValueError("secret values cannot be persisted")
                 row = await memory_commands.revise(
                     db,
@@ -382,6 +385,7 @@ async def command_memory(
                     predicate=command.predicate,
                     value=command.value,
                     confidence=command.confidence,
+                    sensitivity=sensitivity,
                     actor_id=command.actor_id,
                     reason=command.reason,
                 )

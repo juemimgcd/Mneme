@@ -81,7 +81,11 @@ async def extract_candidates(evidence: EvidenceInput) -> list[ExtractedCandidate
                     "content": (
                         "Extract only durable user memories explicitly supported by the excerpt. "
                         "Use only the fixed schema types. Copy an exact supporting quote and its "
-                        "zero-based start/end offsets. Do not decide persistence or status. Return JSON."
+                        "zero-based start/end offsets. Mark sensitivity_signals for identity, health, "
+                        "finance, authentication, political or religious beliefs, sexual orientation, "
+                        "race or ethnicity, trade-union membership, minors, precise location, biometric, "
+                        "genetic, credential, secret, or other sensitive data. Do not decide persistence "
+                        "or status. Return JSON."
                     ),
                 },
                 {"role": "user", "content": evidence.excerpt},

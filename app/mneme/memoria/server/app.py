@@ -14,6 +14,7 @@ from app.mneme.memoria.server.api.errors import AgentAPIError, agent_api_error_h
 from app.mneme.memoria.server.api.events import router as event_router
 from app.mneme.memoria.server.api.health import router as health_router
 from app.mneme.memoria.server.api.memories import router as memories_router
+from app.mneme.memoria.server.api.recommendations import router as recommendations_router
 from app.mneme.memoria.server.api.runs import router as runs_router
 from app.mneme.memoria.server.config import settings
 from app.mneme.memoria.server.observability.context import safe_log
@@ -46,4 +47,5 @@ def create_memory_agent_app() -> FastAPI:
     app.include_router(answers_router, prefix="/v1")
     app.include_router(runs_router, prefix="/v1")
     app.include_router(memories_router, prefix="/v1")
+    app.include_router(recommendations_router, prefix="/v1")
     return app

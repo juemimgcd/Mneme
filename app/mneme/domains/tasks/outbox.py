@@ -471,21 +471,32 @@ async def enqueue_user_memory_settings_changed(
     db: AsyncSession,
     *,
     owner_id: int,
-    automatic_conversation_memory: bool,
+    automatic_conversation_memory: bool | None = None,
+    ad_personalization_enabled: bool | None = None,
     occurred_at: datetime,
 ) -> OutboxEvent:
+    payload = {
+        key: value
+        for key, value in {
+            "automatic_conversation_memory": automatic_conversation_memory,
+            "ad_personalization_enabled": ad_personalization_enabled,
+        }.items()
+        if value is not None
+    }
+    if not payload:
+        raise ValueError("at least one memory setting is required")
     event = MemoryAgentEvent(
         event_id=_memory_event_id(
             "memory-settings-changed",
             str(owner_id),
             occurred_at.isoformat(),
-            str(automatic_conversation_memory),
+            repr(sorted(payload.items())),
         ),
         event_type="user.memory_settings.changed",
         occurred_at=occurred_at,
         owner_id=owner_id,
         knowledge_base_id=None,
-        payload={"automatic_conversation_memory": automatic_conversation_memory},
+        payload=payload,
     )
     return await _enqueue_memory_agent_event(
         db,

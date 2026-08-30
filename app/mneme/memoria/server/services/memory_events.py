@@ -80,16 +80,32 @@ async def _apply_settings(db: AsyncSession, event: AgentEventEnvelope) -> None:
         row = MemorySettings(owner_id=event.owner_id)
         db.add(row)
         await db.flush()
-    current_order = (
+    automatic_order = (
         (row.last_event_occurred_at, row.last_event_id)
         if row.last_event_occurred_at is not None and row.last_event_id is not None
         else None
     )
-    if current_order is not None and _event_order(event) <= current_order:
-        return
-    row.automatic_conversation_memory = payload.automatic_conversation_memory
-    row.last_event_occurred_at = event.occurred_at
-    row.last_event_id = event.event_id
+    if payload.automatic_conversation_memory is not None and (
+        automatic_order is None or _event_order(event) > automatic_order
+    ):
+        row.automatic_conversation_memory = payload.automatic_conversation_memory
+        row.last_event_occurred_at = event.occurred_at
+        row.last_event_id = event.event_id
+    ad_order = (
+        (
+            row.ad_personalization_last_event_occurred_at,
+            row.ad_personalization_last_event_id,
+        )
+        if row.ad_personalization_last_event_occurred_at is not None
+        and row.ad_personalization_last_event_id is not None
+        else None
+    )
+    if payload.ad_personalization_enabled is not None and (
+        ad_order is None or _event_order(event) > ad_order
+    ):
+        row.ad_personalization_enabled = payload.ad_personalization_enabled
+        row.ad_personalization_last_event_occurred_at = event.occurred_at
+        row.ad_personalization_last_event_id = event.event_id
     await db.flush()
 
 
