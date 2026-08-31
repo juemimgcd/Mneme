@@ -6,7 +6,7 @@ Only active revisions are returned for current queries; history queries retain v
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 
 from app.mneme.memoria.server.database import open_read_session
 from app.mneme.memoria.server.models.canonical_memory import CanonicalMemory
@@ -28,6 +28,7 @@ class MemoryRetriever:
     The retriever can select current or historical revisions and constrain
     memory types while preserving owner and optional knowledge-base scope.
     """
+
     async def search(
         self,
         *,
@@ -39,6 +40,7 @@ class MemoryRetriever:
         memory_types: tuple[str, ...] | None = None,
         excluded_memory_types: tuple[str, ...] | None = None,
         evidence_type: Literal["memory", "profile"] = "memory",
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedEvidence]:
         """Search scoped memory revisions and return normalized evidence records.
 
@@ -81,24 +83,51 @@ class MemoryRetriever:
 
         pattern = f"%{query.strip()}%"
         relevance = text_value.ilike(pattern)
-        statement = (
-            select(
+        async with open_read_session() as db:
+            use_semantic = query_embedding is not None
+            if use_semantic:
+                missing_embedding = (
+                    select(MemoryRevision.revision_id)
+                    .join(CanonicalMemory, MemoryRevision.memory_id == CanonicalMemory.memory_id)
+                    .where(and_(*filters), MemoryRevision.embedding.is_(None))
+                    .limit(1)
+                )
+                use_semantic = not bool(await db.scalar(select(missing_embedding.exists())))
+
+            semantic_distance = (
+                MemoryRevision.embedding.cosine_distance(query_embedding).label("semantic_distance")
+                if use_semantic
+                else None
+            )
+            columns = [
                 CanonicalMemory.memory_id,
                 CanonicalMemory.memory_type,
                 CanonicalMemory.confidence,
+                CanonicalMemory.retrieval_weight,
                 MemoryRevision.revision_id,
                 MemoryRevision.subject,
                 MemoryRevision.predicate,
                 MemoryRevision.value,
                 MemoryRevision.valid_from,
                 MemoryRevision.valid_to,
+            ]
+            if semantic_distance is not None:
+                await db.execute(text("SET LOCAL hnsw.ef_search = 100"))
+                await db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
+                columns.append(semantic_distance)
+            ordering = [semantic_distance.asc()] if semantic_distance is not None else [relevance.desc()]
+            statement = (
+                select(*columns)
+                .join(MemoryRevision, MemoryRevision.memory_id == CanonicalMemory.memory_id)
+                .where(and_(*filters))
+                .order_by(
+                    *ordering,
+                    CanonicalMemory.retrieval_weight.desc(),
+                    CanonicalMemory.confidence.desc(),
+                    MemoryRevision.valid_from.desc(),
+                )
+                .limit(top_k)
             )
-            .join(MemoryRevision, MemoryRevision.memory_id == CanonicalMemory.memory_id)
-            .where(and_(*filters))
-            .order_by(relevance.desc(), CanonicalMemory.confidence.desc(), MemoryRevision.valid_from.desc())
-            .limit(top_k)
-        )
-        async with open_read_session() as db:
             rows = (await db.execute(statement)).mappings().all()
 
         return [
@@ -107,9 +136,18 @@ class MemoryRetriever:
                 source_type=evidence_type,
                 source_id=row["memory_id"],
                 content=f"{row['subject']} {row['predicate']} {row['value']}",
-                score=float(row["confidence"]),
+                score=(
+                    1.0 - float(row["semantic_distance"])
+                    if row.get("semantic_distance") is not None
+                    else float(row["confidence"])
+                ),
                 metadata={
                     "memory_type": row["memory_type"],
+                    "confidence": float(row["confidence"]),
+                    "retrieval_weight": float(row.get("retrieval_weight", 1.0)),
+                    "semantic_score": (
+                        1.0 - float(row["semantic_distance"]) if row.get("semantic_distance") is not None else None
+                    ),
                     "valid_from": _isoformat(row["valid_from"]),
                     "valid_to": _isoformat(row["valid_to"]),
                 },

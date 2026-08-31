@@ -25,7 +25,7 @@ from app.mneme.memoria.server.repositories.projections import (
     load_projection_for_update,
     store_projection_batch,
 )
-from app.mneme.memoria.server.services.embeddings import embed_texts
+from app.mneme.memoria.server.services.embeddings import document_embedding_text, embed_texts
 
 
 class IncompleteProjectionError(RuntimeError):
@@ -312,7 +312,16 @@ async def finalize_projection(projection_id: str) -> bool:
                     raise
                 await db.commit()
 
-                embeddings = await embed_texts([chunk.content for chunk in prepared.chunks])
+                embeddings = await embed_texts(
+                    [
+                        document_embedding_text(
+                            file_name=projection.file_name,
+                            section_path=chunk.section_path,
+                            content=chunk.content,
+                        )
+                        for chunk in prepared.chunks
+                    ]
+                )
                 try:
                     async with db.begin():
                         return await _activate_projection(db, prepared, embeddings)

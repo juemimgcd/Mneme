@@ -14,6 +14,7 @@ from app.mneme.memoria.server.retrieval.memories import MemoryRetriever
 from app.mneme.memoria.server.retrieval.profile import PROFILE_MEMORY_TYPES, ProfileRetriever
 from app.mneme.memoria.server.retrieval.relations import RelationRetriever
 from app.mneme.memoria.server.runtime.contracts import RetrievalRequest
+from app.mneme.memoria.server.services.embeddings import embed_texts
 
 RRF_CONSTANT = 60
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class ScopedEvidenceRetriever:
     Each source receives the same owner and knowledge-base scope. A source
     failure is logged and isolated; all-source failure remains terminal.
     """
+
     def __init__(
         self,
         *,
@@ -37,6 +39,8 @@ class ScopedEvidenceRetriever:
         self._memories_factory = memories_factory
         self._profile_factory = profile_factory
         self._relations_factory = relations_factory
+        self._embed_memory_queries = memories_factory is MemoryRetriever
+        self._embed_profile_queries = profile_factory is ProfileRetriever
 
     async def retrieve(self, request: RetrievalRequest) -> list[RetrievedEvidence]:
         """Execute selected evidence-source searches concurrently and fuse results.
@@ -50,11 +54,36 @@ class ScopedEvidenceRetriever:
         """
         if not request.plan.uses_private_sources:
             return []
+        if request.plan.document and request.knowledge_base_id is None:
+            raise ValueError("document retrieval requires a knowledge base scope")
 
         searches: list[tuple[str, Awaitable[list[RetrievedEvidence]]]] = []
+
+        async def embed_memory_query() -> list[float] | None:
+            try:
+                return (await embed_texts([request.question]))[0]
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                safe_log(
+                    logger,
+                    logging.WARNING,
+                    "answer_phase",
+                    phase="retrieve_memory_embedding",
+                    status="failed",
+                    error_code="AGENT_RETRIEVAL_EMBEDDING_FAILED",
+                )
+                return None
+
+        memory_embedding_task = (
+            asyncio.create_task(embed_memory_query())
+            if (
+                (request.plan.memory and self._embed_memory_queries)
+                or (request.plan.profile and self._embed_profile_queries)
+            )
+            else None
+        )
         if request.plan.document:
-            if request.knowledge_base_id is None:
-                raise ValueError("document retrieval requires a knowledge base scope")
             searches.append(
                 (
                     "document",
@@ -69,29 +98,49 @@ class ScopedEvidenceRetriever:
                 )
             )
         if request.plan.memory:
+
+            async def search_memories() -> list[RetrievedEvidence]:
+                values = dict(
+                    owner_id=request.owner_id,
+                    knowledge_base_id=request.knowledge_base_id,
+                    query=request.question,
+                    top_k=request.top_k,
+                    temporal_scope=request.temporal_scope,
+                    excluded_memory_types=PROFILE_MEMORY_TYPES if request.plan.profile else None,
+                )
+                if self._embed_memory_queries:
+                    assert memory_embedding_task is not None
+                    query_embedding = await memory_embedding_task
+                    if query_embedding is not None:
+                        values["query_embedding"] = query_embedding
+                return await self._memories_factory().search(**values)
+
             searches.append(
                 (
                     "memory",
-                    self._memories_factory().search(
-                        owner_id=request.owner_id,
-                        knowledge_base_id=request.knowledge_base_id,
-                        query=request.question,
-                        top_k=request.top_k,
-                        temporal_scope=request.temporal_scope,
-                        excluded_memory_types=PROFILE_MEMORY_TYPES if request.plan.profile else None,
-                    ),
+                    search_memories(),
                 )
             )
         if request.plan.profile:
+
+            async def search_profile() -> list[RetrievedEvidence]:
+                values = dict(
+                    owner_id=request.owner_id,
+                    knowledge_base_id=request.knowledge_base_id,
+                    query=request.question,
+                    top_k=request.top_k,
+                )
+                if self._embed_profile_queries:
+                    assert memory_embedding_task is not None
+                    query_embedding = await memory_embedding_task
+                    if query_embedding is not None:
+                        values["query_embedding"] = query_embedding
+                return await self._profile_factory().search(**values)
+
             searches.append(
                 (
                     "profile",
-                    self._profile_factory().search(
-                        owner_id=request.owner_id,
-                        knowledge_base_id=request.knowledge_base_id,
-                        query=request.question,
-                        top_k=request.top_k,
-                    ),
+                    search_profile(),
                 )
             )
         if request.plan.relations:

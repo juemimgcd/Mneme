@@ -3,12 +3,13 @@
 Owner, knowledge-base, projection, and active-state filters are applied before ranking and limiting.
 """
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.mneme.memoria.server.models.document_chunk import DocumentChunk
 from app.mneme.memoria.server.models.document_projection import DocumentProjection
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievalScope
+from app.mneme.memoria.server.retrieval.fusion import FUSION_CANDIDATE_K
 from app.mneme.memoria.server.services.embeddings import embed_texts
 
 
@@ -21,7 +22,8 @@ async def search_vector(
 ) -> list[DocumentSearchHit]:
     """Return the nearest active document chunks in the authorized scope.
 
-    Query embeddings are normalized by the embedding service. Owner,
+    The backend keeps a wider candidate pool for final fusion. Query embeddings
+    are normalized by the embedding service. Owner,
     knowledge-base, and projection filters are part of the SQL statement so
     unauthorized candidates never participate in nearest-neighbor ranking.
     """
@@ -29,6 +31,8 @@ async def search_vector(
         return []
 
     query_embedding = (await embed_texts([query]))[0]
+    await db.execute(text("SET LOCAL hnsw.ef_search = 100"))
+    await db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
     distance = DocumentChunk.embedding.cosine_distance(query_embedding)
     statement = (
         select(
@@ -54,7 +58,7 @@ async def search_vector(
             DocumentProjection.status == "active",
         )
         .order_by(distance.asc(), DocumentChunk.chunk_id.asc())
-        .limit(limit)
+        .limit(max(limit, FUSION_CANDIDATE_K))
     )
     rows = (await db.execute(statement)).mappings().all()
     return [
