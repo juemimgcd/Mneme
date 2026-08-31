@@ -31,6 +31,18 @@ def embedding_model_ready() -> bool:
     return _embedding_model.cache_info().currsize > 0
 
 
+def memory_embedding_text(*, subject: str, predicate: str, value: str) -> str:
+    return "\n".join((subject.strip(), predicate.strip(), value.strip()))
+
+
+def document_embedding_text(*, file_name: str, section_path: list[str], content: str) -> str:
+    return "\n".join(
+        part
+        for part in (file_name.strip(), " > ".join(section_path).strip(), content.strip())
+        if part
+    )
+
+
 def preload_embedding_model_sync() -> None:
     _embedding_model()
 

@@ -327,6 +327,20 @@ python -m app.mneme.memoria.server.cli.backfill \
   --dry-run
 ```
 
+迁移后补齐历史 memory revision 的语义向量：
+
+```bash
+python -m app.mneme.memoria.server.cli.embedding_backfill --memory --dry-run
+python -m app.mneme.memoria.server.cli.embedding_backfill --memory --batch-size 100
+```
+
+上下文化向量格式升级后重建当前文档 chunk 向量：
+
+```bash
+python -m app.mneme.memoria.server.cli.embedding_backfill --documents --dry-run
+python -m app.mneme.memoria.server.cli.embedding_backfill --documents --batch-size 100
+```
+
 完整删除、重建和恢复流程见[部署指南中的 Memoria operations](deploy/DEPLOY.md#memoria-rebuild-and-deletion-operations)。
 
 ## 项目结构

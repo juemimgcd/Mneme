@@ -105,3 +105,46 @@ that defaults to off. Operators can force the single-agent path immediately by
 setting `memory_agent.multi_agent.enabled` to `false` in `memoria.json`.
 Operators may stage the rollout with `rollout_percent` and `allowed_modes` in
 the same section.
+
+## Public retrieval benchmark
+
+`beir.py` runs a real offline retrieval benchmark on BEIR SciFact. It downloads
+the official archive linked by the Hugging Face dataset card, verifies the
+published MD5, deterministically samples test queries, and compares the
+configured dense model with a TF-IDF lexical baseline, RRF hybrid retrieval,
+and an optional configured CrossEncoder. Generated data and reports stay under
+the git-ignored `storage/eval/` directory.
+
+The application image already contains the model dependencies, so no host
+Python environment is required:
+
+```zsh
+DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
+"$DOCKER" run --rm \
+  --user 0:0 \
+  -e HOME=/tmp \
+  -e HF_ENDPOINT=https://huggingface.co \
+  -e RERANKER_ENABLED=true \
+  -e BEIR_EVAL_GIT_COMMIT="$(git rev-parse HEAD)" \
+  -e BEIR_EVAL_GIT_DIRTY="$(test -z "$(git status --porcelain)" && echo false || echo true)" \
+  -v "$PWD:/app" \
+  -w /app \
+  reminder-app:local \
+  python -m app.mneme.memoria.server.eval.beir \
+  --sample-size 100 \
+  --corpus-size 1000 \
+  --top-k 10 \
+  --candidate-k 50 \
+  --rerank-k 20 \
+  --reranker \
+  --output storage/eval/beir/scifact-report.json
+```
+
+The report records the repository commit and dirty state, dataset checksum and
+revision, sampled query IDs, resolved model source, configuration, timings,
+per-pipeline Recall/MRR/NDCG, and failure samples. Embedding caches are bound to
+the resolved model source and exact sampled document text. TF-IDF is only an offline lexical proxy;
+use live evaluation against PostgreSQL when exact backend parity is required.
+The default 1000-document corpus keeps every qrels-positive document for the
+sampled queries and fills the remainder with fixed-seed distractors. This is a
+repeatable development benchmark, not the official full-corpus BEIR score.

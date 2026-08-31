@@ -15,6 +15,7 @@ class ProfileRetriever:
     The wrapper intentionally reuses MemoryRetriever so profile queries keep
     identical revision, validity, and authorization behavior.
     """
+
     def __init__(self, memories: MemoryRetriever | None = None) -> None:
         self._memories = memories or MemoryRetriever()
 
@@ -25,6 +26,7 @@ class ProfileRetriever:
         knowledge_base_id: str | None,
         query: str,
         top_k: int,
+        query_embedding: list[float] | None = None,
     ) -> list[RetrievedEvidence]:
         """Retrieve current profile facts, preferences, goals, and constraints.
 
@@ -39,4 +41,5 @@ class ProfileRetriever:
             temporal_scope="current",
             memory_types=PROFILE_MEMORY_TYPES,
             evidence_type="profile",
+            query_embedding=query_embedding,
         )

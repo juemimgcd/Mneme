@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.mneme.memoria.server.models.document_chunk import DocumentChunk
 from app.mneme.memoria.server.models.document_projection import DocumentProjection
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievalScope
+from app.mneme.memoria.server.retrieval.fusion import FUSION_CANDIDATE_K
 
 
 async def search_keyword(
@@ -20,8 +21,8 @@ async def search_keyword(
 ) -> list[DocumentSearchHit]:
     """Return full-text matches for the query from active scoped document chunks.
 
-    PostgreSQL ``simple`` configuration favors exact lexical identifiers;
-    callers combine this ranking with dense-vector results for recall.
+    PostgreSQL ``simple`` configuration favors exact lexical identifiers. The
+    backend keeps a wider candidate pool for final dense-weighted fusion.
     """
     if limit <= 0:
         return []
@@ -53,7 +54,7 @@ async def search_keyword(
             DocumentChunk.search_vector.op("@@")(text_query),
         )
         .order_by(rank.desc(), DocumentChunk.chunk_id.asc())
-        .limit(limit)
+        .limit(max(limit, FUSION_CANDIDATE_K))
     )
     rows = (await db.execute(statement)).mappings().all()
     return [

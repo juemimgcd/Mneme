@@ -8,32 +8,40 @@ from collections.abc import Sequence
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievedEvidence
 
 RRF_CONSTANT = 60
+FUSION_CANDIDATE_K = 50
+LEXICAL_RRF_WEIGHT = 0.3
 
 
 def reciprocal_rank_fusion(
     rankings: Sequence[Sequence[DocumentSearchHit]],
     *,
     top_k: int,
+    weights: Sequence[float] | None = None,
 ) -> list[RetrievedEvidence]:
     """Fuse backend rankings without comparing their incompatible raw scores.
 
-    Each unique chunk contributes ``1 / (60 + rank)`` once per ranking.
+    Each unique chunk contributes ``weight / (60 + rank)`` once per ranking.
+    Omitted weights preserve equal fusion for existing callers.
     Deterministic chunk-ID tie breaking keeps replayed evaluations stable.
     """
     if top_k <= 0:
         return []
+    if weights is not None and len(weights) != len(rankings):
+        raise ValueError("weights must match the number of rankings")
 
     hits_by_chunk_id: dict[str, DocumentSearchHit] = {}
     scores_by_chunk_id: dict[str, float] = {}
-    for ranking in rankings:
+    for ranking_index, ranking in enumerate(rankings):
+        weight = weights[ranking_index] if weights is not None else 1.0
         seen_chunk_ids: set[str] = set()
         for rank, hit in enumerate(ranking, start=1):
             if hit.chunk_id in seen_chunk_ids:
                 continue
             seen_chunk_ids.add(hit.chunk_id)
             hits_by_chunk_id.setdefault(hit.chunk_id, hit)
-            scores_by_chunk_id[hit.chunk_id] = scores_by_chunk_id.get(hit.chunk_id, 0.0) + 1.0 / (
-                RRF_CONSTANT + rank
+            scores_by_chunk_id[hit.chunk_id] = (
+                scores_by_chunk_id.get(hit.chunk_id, 0.0)
+                + weight / (RRF_CONSTANT + rank)
             )
 
     ranked_chunk_ids = sorted(

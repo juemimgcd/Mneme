@@ -4,10 +4,13 @@ This module describes storage shape and indexes; lifecycle rules remain in domai
 """
 
 from datetime import datetime
+from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.mneme.memoria.server.config import settings
 from app.mneme.memoria.server.models.base import Base
 
 
@@ -20,6 +23,12 @@ class MemoryRevision(Base):
         ),
         UniqueConstraint("revision_id", "memory_id"),
         Index("ix_memory_revisions_owner_scope", "owner_id", "knowledge_base_id"),
+        Index(
+            "ix_memory_revisions_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
         Index(
             "uq_memory_revisions_open_memory",
             "memory_id",
@@ -38,6 +47,7 @@ class MemoryRevision(Base):
     predicate: Mapped[str] = mapped_column(Text, nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    embedding: Mapped[Any | None] = mapped_column(Vector(settings.EMBEDDING_DIMENSION), nullable=True)
     valid_from: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

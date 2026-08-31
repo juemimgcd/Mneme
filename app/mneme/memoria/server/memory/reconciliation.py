@@ -3,6 +3,7 @@
 Slot locks, scoped evidence, fingerprints, and stale-candidate checks prevent lost updates and silent overwrites.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,7 @@ from app.mneme.memoria.server.models.memory_candidate import (
     Sensitivity,
 )
 from app.mneme.memoria.server.models.memory_revision import MemoryRevision
+from app.mneme.memoria.server.observability.context import safe_log
 from app.mneme.memoria.server.repositories.memories import (
     attach_candidate_evidence,
     attach_revision_evidence,
@@ -41,6 +43,9 @@ from app.mneme.memoria.server.repositories.memories import (
     utc_now,
     validate_evidence_scope,
 )
+from app.mneme.memoria.server.services.embeddings import embed_texts, memory_embedding_text
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -130,6 +135,23 @@ def _combined_sensitivity(current: str, additional: Sensitivity) -> CanonicalSen
     return max((current, additional), key=rank.__getitem__)  # type: ignore[return-value]
 
 
+async def _revision_embedding(*, subject: str, predicate: str, value: str) -> list[float] | None:
+    # ponytail: inline best-effort encoding avoids another worker; use an outbox
+    # projection if memory-write latency or lock contention becomes measurable.
+    try:
+        return (await embed_texts([memory_embedding_text(subject=subject, predicate=predicate, value=value)]))[0]
+    except Exception:
+        safe_log(
+            logger,
+            logging.WARNING,
+            "runtime_log",
+            phase="memory_revision_embedding",
+            status="degraded",
+            error_code="MEMORY_REVISION_EMBEDDING_FAILED",
+        )
+        return None
+
+
 async def _create_memory(
     db: AsyncSession,
     *,
@@ -146,6 +168,7 @@ async def _create_memory(
     actor: str,
     evidence_ids: list[str],
 ) -> CanonicalMemory:
+    embedding = await _revision_embedding(subject=subject, predicate=predicate, value=value)
     memory_id = new_id()
     revision_id = new_id()
     memory = CanonicalMemory(
@@ -173,6 +196,7 @@ async def _create_memory(
         predicate=predicate,
         value=value,
         fingerprint=fingerprint,
+        embedding=embedding,
         reason=reason,
         actor=actor,
     )
@@ -450,6 +474,11 @@ async def revise_memory(
         owner_id=owner_id,
         knowledge_base_id=knowledge_base_id,
     )
+    embedding = await _revision_embedding(
+        subject=normalized_subject,
+        predicate=normalized_predicate,
+        value=normalized_value,
+    )
 
     now = utc_now()
     # Close the previous validity interval before making the new revision
@@ -469,6 +498,7 @@ async def revise_memory(
         predicate=normalized_predicate,
         value=normalized_value,
         fingerprint=fingerprint,
+        embedding=embedding,
         valid_from=now,
         reason=reason,
         actor=actor,
