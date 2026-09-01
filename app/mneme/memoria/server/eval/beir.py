@@ -35,10 +35,13 @@ from app.mneme.domains.eval.service import (
     calculate_ndcg,
     calculate_recall_at_k,
 )
+from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit
 from app.mneme.memoria.server.retrieval.fusion import (
+    DENSE_SCORE_WEIGHT,
     FUSION_CANDIDATE_K,
     LEXICAL_RRF_WEIGHT,
     RRF_CONSTANT,
+    normalized_score_fusion,
 )
 
 DATASET_NAME = "BEIR SciFact"
@@ -388,8 +391,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     lexical_queries = vectorizer.transform(query_texts)
     timings["lexical_fit_seconds"] = round(time.perf_counter() - started, 3)
     started = time.perf_counter()
+    lexical_scores = (lexical_queries @ lexical_corpus.T).toarray()
     lexical = {
-        query_id: _top_ids((lexical_queries[index] @ lexical_corpus.T).toarray().ravel(), doc_ids, args.candidate_k)
+        query_id: _top_ids(lexical_scores[index], doc_ids, args.candidate_k)
         for index, query_id in enumerate(query_ids)
     }
     timings["lexical_search_seconds"] = round(time.perf_counter() - started, 3)
@@ -405,12 +409,46 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         for query_id in query_ids
     }
     timings["hybrid_rrf_seconds"] = round(time.perf_counter() - started, 3)
+    started = time.perf_counter()
+    doc_index = {doc_id: index for index, doc_id in enumerate(doc_ids)}
+    score_fusion = {}
+    for query_index, query_id in enumerate(query_ids):
+        dense_hits = [
+            DocumentSearchHit(
+                doc_id,
+                doc_id,
+                doc_texts[doc_index[doc_id]],
+                {},
+                float(dense_scores[query_index, doc_index[doc_id]]),
+            )
+            for doc_id in dense[query_id]
+        ]
+        lexical_hits = [
+            DocumentSearchHit(
+                doc_id,
+                doc_id,
+                doc_texts[doc_index[doc_id]],
+                {},
+                float(lexical_scores[query_index, doc_index[doc_id]]),
+            )
+            for doc_id in lexical[query_id]
+        ]
+        score_fusion[query_id] = [
+            item.evidence_id
+            for item in normalized_score_fusion(
+                (dense_hits, lexical_hits),
+                top_k=args.candidate_k,
+                weights=(DENSE_SCORE_WEIGHT, 1.0 - DENSE_SCORE_WEIGHT),
+            )
+        ]
+    timings["score_fusion_seconds"] = round(time.perf_counter() - started, 3)
 
     rankings = {
         "dense": dense,
         "lexical_tfidf": lexical,
         "hybrid_rrf": hybrid,
         "dense_weighted_rrf": weighted_hybrid,
+        "normalized_score_fusion": score_fusion,
     }
     reranker_model = None
     if args.reranker:
@@ -494,6 +532,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "production_candidate_k": FUSION_CANDIDATE_K,
             "dense_rrf_weight": 1.0,
             "lexical_rrf_weight": LEXICAL_RRF_WEIGHT,
+            "dense_score_weight": DENSE_SCORE_WEIGHT,
         },
         "metrics": metrics,
         "timings": timings,

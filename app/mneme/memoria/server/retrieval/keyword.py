@@ -28,7 +28,7 @@ async def search_keyword(
         return []
 
     text_query = func.websearch_to_tsquery(literal_column("'simple'::regconfig"), query)
-    rank = func.ts_rank_cd(DocumentChunk.search_vector, text_query)
+    rank = func.ts_rank_cd(DocumentChunk.search_vector, text_query).label("score")
     statement = (
         select(
             DocumentChunk.chunk_id,
@@ -39,6 +39,7 @@ async def search_keyword(
             DocumentChunk.page_no,
             DocumentChunk.section_path,
             DocumentProjection.file_name,
+            rank,
         )
         .join(
             DocumentProjection,
@@ -62,6 +63,7 @@ async def search_keyword(
             chunk_id=row["chunk_id"],
             document_id=row["document_id"],
             content=row["content"],
+            score=float(row["score"]),
             metadata={
                 "document_version": row["document_version"],
                 "file_name": row["file_name"],

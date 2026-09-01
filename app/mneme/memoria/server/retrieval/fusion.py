@@ -1,6 +1,6 @@
-"""Fuse document rankings with deterministic reciprocal-rank fusion.
+"""Fuse document rankings with deterministic rank and normalized-score fusion.
 
-Fusion uses rank positions instead of incomparable raw vector and lexical score scales.
+Backend scores are normalized per query before comparison across retrieval methods.
 """
 
 from collections.abc import Sequence
@@ -8,8 +8,9 @@ from collections.abc import Sequence
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievedEvidence
 
 RRF_CONSTANT = 60
-FUSION_CANDIDATE_K = 100
+FUSION_CANDIDATE_K = 200
 LEXICAL_RRF_WEIGHT = 0.55
+DENSE_SCORE_WEIGHT = 0.55
 
 
 def reciprocal_rank_fusion(
@@ -42,6 +43,51 @@ def reciprocal_rank_fusion(
             scores_by_chunk_id[hit.chunk_id] = (
                 scores_by_chunk_id.get(hit.chunk_id, 0.0)
                 + weight / (RRF_CONSTANT + rank)
+            )
+
+    ranked_chunk_ids = sorted(
+        scores_by_chunk_id,
+        key=lambda chunk_id: (-scores_by_chunk_id[chunk_id], chunk_id),
+    )[:top_k]
+    return [
+        RetrievedEvidence(
+            evidence_id=chunk_id,
+            source_type="document",
+            source_id=hits_by_chunk_id[chunk_id].document_id,
+            content=hits_by_chunk_id[chunk_id].content,
+            score=scores_by_chunk_id[chunk_id],
+            metadata=hits_by_chunk_id[chunk_id].metadata,
+        )
+        for chunk_id in ranked_chunk_ids
+    ]
+
+
+def normalized_score_fusion(
+    rankings: Sequence[Sequence[DocumentSearchHit]],
+    *,
+    top_k: int,
+    weights: Sequence[float],
+) -> list[RetrievedEvidence]:
+    """Min-max normalize each backend's scores, then combine weighted candidates."""
+    if top_k <= 0:
+        return []
+    if len(weights) != len(rankings):
+        raise ValueError("weights must match the number of rankings")
+
+    hits_by_chunk_id: dict[str, DocumentSearchHit] = {}
+    scores_by_chunk_id: dict[str, float] = {}
+    for ranking, weight in zip(rankings, weights, strict=True):
+        unique_hits = list({hit.chunk_id: hit for hit in ranking}.values())
+        if not unique_hits:
+            continue
+        minimum = min(hit.score for hit in unique_hits)
+        maximum = max(hit.score for hit in unique_hits)
+        spread = maximum - minimum
+        for hit in unique_hits:
+            hits_by_chunk_id.setdefault(hit.chunk_id, hit)
+            normalized = (hit.score - minimum) / spread if spread > 0 else 1.0
+            scores_by_chunk_id[hit.chunk_id] = (
+                scores_by_chunk_id.get(hit.chunk_id, 0.0) + weight * normalized
             )
 
     ranked_chunk_ids = sorted(
