@@ -29,3 +29,4 @@ class DocumentSearchHit:
     document_id: str
     content: str
     metadata: dict[str, Any]
+    score: float = 0.0

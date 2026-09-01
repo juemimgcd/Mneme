@@ -34,6 +34,7 @@ async def search_vector(
     await db.execute(text("SET LOCAL hnsw.ef_search = 100"))
     await db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
     distance = DocumentChunk.embedding.cosine_distance(query_embedding)
+    similarity = (1 - distance).label("score")
     statement = (
         select(
             DocumentChunk.chunk_id,
@@ -44,6 +45,7 @@ async def search_vector(
             DocumentChunk.page_no,
             DocumentChunk.section_path,
             DocumentProjection.file_name,
+            similarity,
         )
         .join(
             DocumentProjection,
@@ -66,6 +68,7 @@ async def search_vector(
             chunk_id=row["chunk_id"],
             document_id=row["document_id"],
             content=row["content"],
+            score=float(row["score"]),
             metadata={
                 "document_version": row["document_version"],
                 "file_name": row["file_name"],

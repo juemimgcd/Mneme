@@ -6,8 +6,8 @@ The component owns document-level fusion but not cross-source answer planning.
 from app.mneme.memoria.server.database import open_read_session
 from app.mneme.memoria.server.retrieval.contracts import RetrievalScope, RetrievedEvidence
 from app.mneme.memoria.server.retrieval.fusion import (
-    LEXICAL_RRF_WEIGHT,
-    reciprocal_rank_fusion,
+    DENSE_SCORE_WEIGHT,
+    normalized_score_fusion,
 )
 from app.mneme.memoria.server.retrieval.keyword import search_keyword
 from app.mneme.memoria.server.retrieval.vector import search_vector
@@ -25,7 +25,7 @@ class DocumentRetriever:
         query: str,
         top_k: int,
     ) -> list[RetrievedEvidence]:
-        """Search vector and keyword indexes and combine their ranks with RRF.
+        """Search vector and keyword indexes and combine normalized raw scores.
 
         Both queries apply the same scope and active-projection constraints.
         Empty or non-positive limits return no evidence without touching storage.
@@ -36,8 +36,8 @@ class DocumentRetriever:
         async with open_read_session() as db:
             vector_hits = await search_vector(db, scope=scope, query=query, limit=top_k)
             keyword_hits = await search_keyword(db, scope=scope, query=query, limit=top_k)
-        return reciprocal_rank_fusion(
+        return normalized_score_fusion(
             (vector_hits, keyword_hits),
             top_k=top_k,
-            weights=(1.0, LEXICAL_RRF_WEIGHT),
+            weights=(DENSE_SCORE_WEIGHT, 1.0 - DENSE_SCORE_WEIGHT),
         )

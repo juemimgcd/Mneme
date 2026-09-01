@@ -112,7 +112,7 @@ the same section.
 the official archive linked by the Hugging Face dataset card, verifies the
 published MD5, deterministically samples test queries, and compares the
 configured dense model with a TF-IDF lexical baseline, RRF hybrid retrieval,
-and an optional configured CrossEncoder. Generated data and reports stay under
+normalized score fusion, and an optional configured CrossEncoder. Generated data and reports stay under
 the git-ignored `storage/eval/` directory.
 
 The application image already contains the model dependencies, so no host
@@ -134,7 +134,7 @@ DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
   --sample-size 100 \
   --corpus-size 1000 \
   --top-k 10 \
-  --candidate-k 50 \
+  --candidate-k 200 \
   --rerank-k 20 \
   --reranker \
   --output storage/eval/beir/scifact-report.json
