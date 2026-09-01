@@ -25,7 +25,10 @@ from app.mneme.memoria.server.repositories.projections import (
     load_projection_for_update,
     store_projection_batch,
 )
-from app.mneme.memoria.server.services.embeddings import document_embedding_text, embed_texts
+from app.mneme.memoria.server.services.embeddings import (
+    document_embedding_text,
+    embed_texts_with_sparse,
+)
 
 
 class IncompleteProjectionError(RuntimeError):
@@ -202,6 +205,7 @@ async def _activate_projection(
     db: AsyncSession,
     prepared: PreparedProjection,
     embeddings: list[list[float]],
+    sparse_embeddings: list[Any | None],
 ) -> bool:
     projection = await load_projection_for_update(db, prepared.projection_id)
     if projection is None:
@@ -218,6 +222,8 @@ async def _activate_projection(
         raise ProjectionIntegrityError("projection batches changed during embedding")
     if len(embeddings) != len(rechecked.chunks):
         raise ProjectionIntegrityError("embedding count does not match chunk count")
+    if len(sparse_embeddings) != len(rechecked.chunks):
+        raise ProjectionIntegrityError("sparse embedding count does not match chunk count")
 
     scope_filter: list[Any] = [
         DocumentProjection.owner_id == projection.owner_id,
@@ -257,9 +263,15 @@ async def _activate_projection(
                 page_no=chunk.page_no,
                 section_path=chunk.section_path,
                 embedding=embedding,
+                sparse_embedding=sparse_embedding,
                 is_active=False,
             )
-            for chunk, embedding in zip(rechecked.chunks, embeddings, strict=True)
+            for chunk, embedding, sparse_embedding in zip(
+                rechecked.chunks,
+                embeddings,
+                sparse_embeddings,
+                strict=True,
+            )
         ]
     )
     await db.flush()
@@ -312,7 +324,7 @@ async def finalize_projection(projection_id: str) -> bool:
                     raise
                 await db.commit()
 
-                embeddings = await embed_texts(
+                embeddings, sparse_embeddings = await embed_texts_with_sparse(
                     [
                         document_embedding_text(
                             file_name=projection.file_name,
@@ -324,7 +336,12 @@ async def finalize_projection(projection_id: str) -> bool:
                 )
                 try:
                     async with db.begin():
-                        return await _activate_projection(db, prepared, embeddings)
+                        return await _activate_projection(
+                            db,
+                            prepared,
+                            embeddings,
+                            sparse_embeddings,
+                        )
                 except ProjectionIntegrityError as exc:
                     await _mark_failed(db, projection_id, str(exc))
                     raise

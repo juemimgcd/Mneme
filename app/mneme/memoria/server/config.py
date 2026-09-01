@@ -30,6 +30,9 @@ class MemoryAgentSettings(BaseSettings):
     EMBEDDING_CACHE_DIR: str = "storage/model_cache/sentence_transformers"
     EMBEDDING_LOCAL_FILES_ONLY: bool = False
     EMBEDDING_PRELOAD_ON_STARTUP: bool = False
+    EMBEDDING_SPARSE_ENABLED: bool = False
+    EMBEDDING_SPARSE_HEAD_PATH: str = ""
+    EMBEDDING_SPARSE_DIMENSION: int = 250002
     EXTRACTION_LLM_BASE_URL: str = ""
     EXTRACTION_LLM_API_KEY: SecretStr = SecretStr("")
     EXTRACTION_LLM_MODEL: str = ""

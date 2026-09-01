@@ -191,6 +191,8 @@ Mneme 使用两层配置：
 | `NEO4J_URI` / `NEO4J_PASSWORD` | 图谱服务连接 |
 | `MEMORY_AGENT_EMBEDDING_MODEL_NAME` | Memory Agent embedding 模型，默认 `BAAI/bge-m3` |
 | `MEMORY_AGENT_EMBEDDING_LOCAL_FILES_ONLY` | 是否只从本地缓存加载模型 |
+| `MEMORY_AGENT_EMBEDDING_SPARSE_ENABLED` | 是否启用 BGE-M3 sparse 文档检索；启用后需先回填活动 chunk |
+| `MEMORY_AGENT_EMBEDDING_SPARSE_HEAD_PATH` | 可选的本地 `sparse_linear.pt` 路径；为空时从 BGE-M3 缓存解析 |
 | `APP_HOST_PORT` | 宿主机监听地址，生产环境建议绑定 `127.0.0.1:8000` |
 
 ### Agent 配置入口
@@ -340,6 +342,10 @@ python -m app.mneme.memoria.server.cli.embedding_backfill --memory --batch-size 
 python -m app.mneme.memoria.server.cli.embedding_backfill --documents --dry-run
 python -m app.mneme.memoria.server.cli.embedding_backfill --documents --batch-size 100
 ```
+
+启用 BGE-M3 sparse 检索时，先执行数据库迁移，再设置
+`MEMORY_AGENT_EMBEDDING_SPARSE_ENABLED=true` 并运行上述 document backfill。任一 owner/KB
+仍有活动 chunk 缺少 sparse 向量时，检索会继续使用原有 dense + keyword 路径。
 
 完整删除、重建和恢复流程见[部署指南中的 Memoria operations](deploy/DEPLOY.md#memoria-rebuild-and-deletion-operations)。
 

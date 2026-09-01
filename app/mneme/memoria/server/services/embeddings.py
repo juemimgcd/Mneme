@@ -8,7 +8,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from pgvector import SparseVector
+
 from app.mneme.memoria.server.config import settings
+
+SPARSE_HEAD_FILE = "sparse_linear.pt"
+SPARSE_MAX_NONZERO = 1000
 
 
 @lru_cache(maxsize=1)
@@ -31,6 +36,43 @@ def embedding_model_ready() -> bool:
     return _embedding_model.cache_info().currsize > 0
 
 
+def sparse_embeddings_enabled() -> bool:
+    return settings.EMBEDDING_SPARSE_ENABLED
+
+
+@lru_cache(maxsize=1)
+def _sparse_head() -> Any:
+    import torch
+    from huggingface_hub import hf_hub_download
+
+    configured = Path(settings.EMBEDDING_SPARSE_HEAD_PATH).expanduser()
+    model_source = settings.EMBEDDING_MODEL_PATH.strip() or settings.EMBEDDING_MODEL_NAME.strip()
+    bundled = Path(model_source).expanduser() / SPARSE_HEAD_FILE
+    if settings.EMBEDDING_SPARSE_HEAD_PATH:
+        if not configured.is_file():
+            raise FileNotFoundError(f"configured sparse embedding head does not exist: {configured}")
+        head_path = configured
+    elif bundled.is_file():
+        head_path = bundled
+    else:
+        head_path = Path(
+            hf_hub_download(
+                repo_id=settings.EMBEDDING_MODEL_NAME,
+                filename=SPARSE_HEAD_FILE,
+                cache_dir=str(Path(settings.EMBEDDING_CACHE_DIR).expanduser()),
+                local_files_only=settings.EMBEDDING_LOCAL_FILES_ONLY,
+            )
+        )
+
+    state = torch.load(head_path, map_location="cpu", weights_only=True)
+    weight = state.get("weight")
+    if weight is None or weight.ndim != 2 or weight.shape[0] != 1:
+        raise RuntimeError(f"invalid sparse embedding head: {head_path}")
+    head = torch.nn.Linear(int(weight.shape[1]), 1)
+    head.load_state_dict(state)
+    return head.eval()
+
+
 def memory_embedding_text(*, subject: str, predicate: str, value: str) -> str:
     return "\n".join((subject.strip(), predicate.strip(), value.strip()))
 
@@ -45,6 +87,8 @@ def document_embedding_text(*, file_name: str, section_path: list[str], content:
 
 def preload_embedding_model_sync() -> None:
     _embedding_model()
+    if sparse_embeddings_enabled():
+        _sparse_head()
 
 
 async def preload_embedding_model() -> None:
@@ -77,3 +121,68 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     return await asyncio.to_thread(_embed_texts_sync, texts)
+
+
+def _embed_texts_with_sparse_sync(texts: list[str]) -> tuple[list[list[float]], list[SparseVector]]:
+    import torch
+
+    model = _embedding_model()
+    outputs = model.encode(
+        texts,
+        output_value=None,
+        convert_to_numpy=False,
+        normalize_embeddings=True,
+        show_progress_bar=False,
+    )
+    tokenizer = model.tokenizer
+    if tokenizer.vocab_size != settings.EMBEDDING_SPARSE_DIMENSION:
+        raise RuntimeError(
+            "embedding tokenizer vocabulary does not match EMBEDDING_SPARSE_DIMENSION"
+        )
+    head = _sparse_head().to(outputs[0]["token_embeddings"].device)
+    ignored_token_ids = {
+        tokenizer.cls_token_id,
+        tokenizer.eos_token_id,
+        tokenizer.pad_token_id,
+        tokenizer.unk_token_id,
+    }
+    dense_vectors: list[list[float]] = []
+    sparse_vectors: list[SparseVector] = []
+    with torch.inference_mode():
+        for output in outputs:
+            dense = output["sentence_embedding"].detach().cpu().tolist()
+            if len(dense) != settings.EMBEDDING_DIMENSION:
+                raise RuntimeError(
+                    f"embedding model must return {settings.EMBEDDING_DIMENSION}-dimension vectors"
+                )
+            token_ids = output["input_ids"].detach().cpu().tolist()
+            token_embeddings = output["token_embeddings"]
+            token_weights = torch.relu(head(token_embeddings)).squeeze(-1).detach().cpu().tolist()
+            lexical_weights: dict[int, float] = {}
+            for token_id, weight in zip(token_ids, token_weights, strict=True):
+                if token_id in ignored_token_ids or weight <= lexical_weights.get(token_id, 0.0):
+                    continue
+                lexical_weights[token_id] = float(weight)
+            if len(lexical_weights) > SPARSE_MAX_NONZERO:
+                # ponytail: pgvector sparsevec caps nonzero entries; keep the strongest model weights.
+                lexical_weights = dict(
+                    sorted(lexical_weights.items(), key=lambda item: item[1], reverse=True)[
+                        :SPARSE_MAX_NONZERO
+                    ]
+                )
+            dense_vectors.append(dense)
+            sparse_vectors.append(SparseVector(lexical_weights, settings.EMBEDDING_SPARSE_DIMENSION))
+    if len(dense_vectors) != len(texts):
+        raise RuntimeError("embedding model returned an unexpected vector count")
+    return dense_vectors, sparse_vectors
+
+
+async def embed_texts_with_sparse(
+    texts: list[str],
+) -> tuple[list[list[float]], list[SparseVector | None]]:
+    if not texts:
+        return [], []
+    if not sparse_embeddings_enabled():
+        dense = await embed_texts(texts)
+        return dense, [None] * len(dense)
+    return await asyncio.to_thread(_embed_texts_with_sparse_sync, texts)
