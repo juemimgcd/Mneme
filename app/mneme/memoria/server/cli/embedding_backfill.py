@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import json
+from typing import Any
 
 from sqlalchemy import func, select, update
 
@@ -13,6 +14,7 @@ from app.mneme.memoria.server.models.memory_revision import MemoryRevision
 from app.mneme.memoria.server.services.embeddings import (
     document_embedding_text,
     embed_texts,
+    embed_texts_with_sparse,
     memory_embedding_text,
 )
 
@@ -114,7 +116,7 @@ async def document_embedding_backfill(args: argparse.Namespace) -> dict:
         if not rows:
             break
 
-        vectors = await embed_texts(
+        vectors, sparse_vectors = await embed_texts_with_sparse(
             [
                 document_embedding_text(
                     file_name=row.file_name,
@@ -125,11 +127,14 @@ async def document_embedding_backfill(args: argparse.Namespace) -> dict:
             ]
         )
         async with open_write_session() as db:
-            for row, vector in zip(rows, vectors, strict=True):
+            for row, vector, sparse_vector in zip(rows, vectors, sparse_vectors, strict=True):
+                values: dict[str, Any] = {"embedding": vector}
+                if sparse_vector is not None:
+                    values["sparse_embedding"] = sparse_vector
                 result = await db.execute(
                     update(DocumentChunk)
                     .where(DocumentChunk.id == row.id, DocumentChunk.is_active.is_(True))
-                    .values(embedding=vector)
+                    .values(**values)
                 )
                 updated += result.rowcount or 0
         cursor = rows[-1].id

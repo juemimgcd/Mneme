@@ -5,7 +5,7 @@ This module describes storage shape and indexes; lifecycle rules remain in domai
 
 from typing import Any
 
-from pgvector.sqlalchemy import Vector
+from pgvector.sqlalchemy import SPARSEVEC, Vector
 from sqlalchemy import Boolean, Computed, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
@@ -39,6 +39,12 @@ class DocumentChunk(Base):
             postgresql_using="gin",
         ),
         Index(
+            "ix_document_chunks_sparse_embedding_hnsw",
+            "sparse_embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"sparse_embedding": "sparsevec_ip_ops"},
+        ),
+        Index(
             "ix_document_chunks_active_scope",
             "owner_id",
             "knowledge_base_id",
@@ -68,4 +74,8 @@ class DocumentChunk(Base):
     page_no: Mapped[int | None] = mapped_column(Integer)
     section_path: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     embedding: Mapped[Any] = mapped_column(Vector(settings.EMBEDDING_DIMENSION), nullable=False)
+    sparse_embedding: Mapped[Any | None] = mapped_column(
+        SPARSEVEC(settings.EMBEDDING_SPARSE_DIMENSION),
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

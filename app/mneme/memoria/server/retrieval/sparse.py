@@ -1,8 +1,6 @@
-"""Retrieve document chunks by pgvector cosine distance inside an authorized scope.
+"""Retrieve document chunks by BGE-M3 sparse inner-product similarity."""
 
-Owner, knowledge-base, projection, and active-state filters are applied before ranking and limiting.
-"""
-
+from pgvector import SparseVector
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,33 +8,40 @@ from app.mneme.memoria.server.models.document_chunk import DocumentChunk
 from app.mneme.memoria.server.models.document_projection import DocumentProjection
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievalScope
 from app.mneme.memoria.server.retrieval.fusion import FUSION_CANDIDATE_K
-from app.mneme.memoria.server.services.embeddings import embed_texts
 
 
-async def search_vector(
+async def sparse_scope_ready(db: AsyncSession, *, scope: RetrievalScope) -> bool:
+    missing = (
+        select(DocumentChunk.id)
+        .join(DocumentProjection)
+        .where(
+            DocumentChunk.owner_id == scope.owner_id,
+            DocumentChunk.knowledge_base_id == scope.knowledge_base_id,
+            DocumentChunk.is_active.is_(True),
+            DocumentChunk.sparse_embedding.is_(None),
+            DocumentProjection.owner_id == scope.owner_id,
+            DocumentProjection.knowledge_base_id == scope.knowledge_base_id,
+            DocumentProjection.status == "active",
+        )
+        .limit(1)
+    )
+    return (await db.scalar(missing)) is None
+
+
+async def search_sparse(
     db: AsyncSession,
     *,
     scope: RetrievalScope,
-    query: str,
+    query_embedding: SparseVector,
     limit: int,
-    query_embedding: list[float] | None = None,
 ) -> list[DocumentSearchHit]:
-    """Return the nearest active document chunks in the authorized scope.
-
-    The backend keeps a wider candidate pool for final fusion. Query embeddings
-    are normalized by the embedding service. Owner,
-    knowledge-base, and projection filters are part of the SQL statement so
-    unauthorized candidates never participate in nearest-neighbor ranking.
-    """
-    if limit <= 0:
+    if limit <= 0 or not query_embedding.indices():
         return []
 
-    if query_embedding is None:
-        query_embedding = (await embed_texts([query]))[0]
     await db.execute(text("SET LOCAL hnsw.ef_search = 100"))
     await db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
-    distance = DocumentChunk.embedding.cosine_distance(query_embedding)
-    similarity = (1 - distance).label("score")
+    distance = DocumentChunk.sparse_embedding.max_inner_product(query_embedding)
+    similarity = (-distance).label("score")
     statement = (
         select(
             DocumentChunk.chunk_id,
@@ -49,14 +54,12 @@ async def search_vector(
             DocumentProjection.file_name,
             similarity,
         )
-        .join(
-            DocumentProjection,
-            DocumentProjection.projection_id == DocumentChunk.projection_id,
-        )
+        .join(DocumentProjection)
         .where(
             DocumentChunk.owner_id == scope.owner_id,
             DocumentChunk.knowledge_base_id == scope.knowledge_base_id,
             DocumentChunk.is_active.is_(True),
+            DocumentChunk.sparse_embedding.is_not(None),
             DocumentProjection.owner_id == scope.owner_id,
             DocumentProjection.knowledge_base_id == scope.knowledge_base_id,
             DocumentProjection.status == "active",
