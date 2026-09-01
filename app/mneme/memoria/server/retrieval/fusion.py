@@ -8,8 +8,8 @@ from collections.abc import Sequence
 from app.mneme.memoria.server.retrieval.contracts import DocumentSearchHit, RetrievedEvidence
 
 RRF_CONSTANT = 60
-FUSION_CANDIDATE_K = 50
-LEXICAL_RRF_WEIGHT = 0.3
+FUSION_CANDIDATE_K = 100
+LEXICAL_RRF_WEIGHT = 0.55
 
 
 def reciprocal_rank_fusion(
